@@ -1,4 +1,4 @@
-import { Activity, Ambulance, Bell, Boxes, BriefcaseMedical, ClipboardList, Droplets, ChartNoAxesCombined, FileSpreadsheet, MapPinned, Settings } from 'lucide-react'
+import { Activity, Ambulance, Bell, Boxes, BriefcaseMedical, CalendarPlus, ClipboardList, Droplets, ChartNoAxesCombined, FileSpreadsheet, MapPinned, Settings } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 const navigationItems = [
@@ -7,6 +7,7 @@ const navigationItems = [
   { to: '/notifications', label: 'Notifications', icon: Bell },
   { to: '/hospitals', label: 'Find hospitals', icon: MapPinned },
   { to: '/ambulance', label: 'Ambulance services', icon: Ambulance },
+  { to: '/appointments', label: 'Book an appointment', icon: CalendarPlus },
   { to: '/oxygen', label: 'Oxygen monitoring', icon: Droplets },
   { to: '/resources', label: 'Resource management', icon: Boxes },
   { to: '/audit', label: 'Audit Centre', icon: ClipboardList },

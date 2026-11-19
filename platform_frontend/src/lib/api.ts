@@ -6,6 +6,8 @@ import type {
   AmbulanceRequest,
   AmbulanceRequestCreate,
   AmbulanceRequestStatus,
+  Appointment,
+  AppointmentCreate,
   Department,
   BloodStock,
   ChangePasswordRequest,
@@ -18,6 +20,7 @@ import type {
   HospitalDetails,
   HospitalResource,
   HospitalStaff,
+  HealthcareProfessional,
   LoginResponse,
   NotificationPreference,
   NotificationRecord,
@@ -200,6 +203,19 @@ export async function cancelAmbulanceRequest(requestId: number): Promise<Ambulan
   const response = await api.post<AmbulanceRequest>(
     `ambulance/requests/${requestId}/cancel/`,
   )
+  return response.data
+}
+
+export function getHealthcareProfessionals(): Promise<HealthcareProfessional[]> {
+  return fetchCollection<HealthcareProfessional>('appointments/professionals/')
+}
+
+export function getAppointments(): Promise<Appointment[]> {
+  return fetchCollection<Appointment>('appointments/bookings/')
+}
+
+export async function createAppointment(appointment: AppointmentCreate): Promise<Appointment> {
+  const response = await api.post<Appointment>('appointments/bookings/', appointment)
   return response.data
 }
 

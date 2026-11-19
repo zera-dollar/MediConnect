@@ -162,6 +162,7 @@ All endpoints are under `/api/` and require a JWT Bearer token except registrati
 | `/api/resources/`       | resources    | Categories, types, stocks, blood, O₂ |
 | `/api/notifications/`   | notifications| In-app notifications                 |
 | `/api/ambulance/`      | ambulances   | Patient transport requests and tracking |
+| `/api/appointments/`   | appointments | Professional listings and patient bookings |
 
 ---
 
@@ -344,6 +345,13 @@ The migrated Organs category tracks aggregate transplant resource data only. It 
 - `POST /api/ambulance/requests/{id}/cancel/` – requester cancels a request before dispatch.
 
 Hospital staff can only manage requests for hospitals where they have an active ADMIN, MANAGER, or COORDINATOR membership. The included workflow is not connected to an ambulance provider or live GPS source; dispatchers enter tracking updates manually.
+
+## Appointments
+
+- `GET /api/appointments/professionals/` – list active healthcare professionals currently marked available.
+- `GET/POST /api/appointments/bookings/` – patients list their own requests or submit a booking with the professional, date/time, duration, patient name, and at least one contact method.
+
+Patients can view only their own bookings; professionals can view bookings assigned to them, and platform admins can view all bookings. New bookings start with `REQUESTED` status.
 
 ---
 

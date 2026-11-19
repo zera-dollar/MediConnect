@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Activity, ArrowLeft, UserRoundPlus } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { registerProfessional } from '../lib/api'
 import type { UserRegistration } from '../types'
 
@@ -22,12 +22,14 @@ const initialForm: UserRegistration = {
 
 export function RegisterPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = (location.state as { from?: string } | null)?.from
   const [form, setForm] = useState(initialForm)
   const [locations, setLocations] = useState('')
   const [error, setError] = useState<string | null>(null)
   const mutation = useMutation({
     mutationFn: registerProfessional,
-    onSuccess: () => navigate('/connect', { replace: true, state: { registered: true } }),
+    onSuccess: () => navigate('/connect', { replace: true, state: { registered: true, from: returnTo } }),
     onError: () => setError('Registration failed. Check your details, password policy, and API connection.'),
   })
 
@@ -54,7 +56,7 @@ export function RegisterPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas px-5 py-10">
       <div className="w-full max-w-2xl">
-        <Link to="/connect" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-ink">
+        <Link to="/connect" state={returnTo ? { from: returnTo } : undefined} className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-ink">
           <ArrowLeft size={16} aria-hidden="true" /> Back to sign in
         </Link>
         <section className="rounded-xl border border-black/[0.06] bg-white p-6 shadow-panel sm:p-9">

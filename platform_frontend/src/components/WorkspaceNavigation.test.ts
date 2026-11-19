@@ -22,6 +22,8 @@ describe('workspace navigation', () => {
     expect(html).toContain('Find hospitals')
     expect(html).toContain('href="/ambulance"')
     expect(html).toContain('Ambulance services')
+    expect(html).toContain('href="/appointments"')
+    expect(html).toContain('Book an appointment')
     expect(html).toContain('href="/oxygen"')
     expect(html).toContain('href="/resources"')
     expect(html).toContain('href="/analytics"')

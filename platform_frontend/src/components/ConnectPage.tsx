@@ -22,7 +22,8 @@ export function ConnectPage() {
     onSuccess: async (session) => {
       await clearCachedAccountData(queryClient)
       setSession(session.access, session.user, session.refresh)
-      navigate('/', { replace: true })
+      const returnTo = (location.state as { from?: string } | null)?.from
+      navigate(returnTo ?? '/', { replace: true })
     },
   })
 

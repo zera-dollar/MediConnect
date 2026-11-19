@@ -427,3 +427,37 @@ export interface AmbulanceLocationUpdate {
   longitude: number
   eta_minutes?: number
 }
+
+export interface HealthcareProfessional {
+  id: number
+  full_name: string
+  role: 'DOCTOR' | 'NURSE' | 'SPECIALIST'
+  specialization: string
+  availability_status: string
+}
+
+export interface Appointment {
+  id: number
+  patient: number
+  professional: number
+  professional_name: string
+  professional_role: HealthcareProfessional['role']
+  professional_specialization: string
+  patient_name: string
+  patient_email: string
+  patient_phone: string
+  start_datetime: string
+  duration_minutes: number
+  status: 'REQUESTED' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED'
+  created_at: string
+  updated_at: string
+}
+
+export interface AppointmentCreate {
+  professional: number
+  patient_name: string
+  patient_email: string
+  patient_phone: string
+  start_datetime: string
+  duration_minutes: number
+}

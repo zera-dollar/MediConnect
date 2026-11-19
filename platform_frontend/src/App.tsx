@@ -14,6 +14,7 @@ const NotificationsDashboard = lazy(() => import('./components/NotificationsDash
 const RegisterPage = lazy(() => import('./components/RegisterPage').then((module) => ({ default: module.RegisterPage })))
 const HospitalMapDashboard = lazy(() => import('./components/HospitalMapDashboard').then((module) => ({ default: module.HospitalMapDashboard })))
 const AmbulanceDashboard = lazy(() => import('./components/AmbulanceDashboard').then((module) => ({ default: module.AmbulanceDashboard })))
+const AppointmentDashboard = lazy(() => import('./components/AppointmentDashboard').then((module) => ({ default: module.AppointmentDashboard })))
 
 export function DashboardLoadingFallback() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/hospitals" element={<HospitalMapDashboard />} />
         <Route path="/ambulance" element={<AmbulanceDashboard />} />
+        <Route path="/appointments" element={<AppointmentDashboard />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

@@ -19,6 +19,8 @@ Start the backend separately, then select **Connect live data** and sign in with
 
 Patients and professionals can create an account from the sign-in page. Hospital and platform administrator accounts must be created by an administrator.
 
+Patient accounts can open `/appointments` to request time with an available healthcare professional. Each request records the patient’s name, email or phone, appointment date/time, and duration; requests appear in the patient’s appointment list with their current status.
+
 The API base URL defaults to `http://127.0.0.1:8000/api`. Copy `.env.example` to `.env.local` to configure the API URL, `VITE_GOOGLE_MAPS_API_KEY`, and optional `VITE_AMBULANCE_PHONE`, then restart Vite. Restrict the Google Maps key to the frontend origins and enable Maps JavaScript API and Directions API with billing.
 
 The dashboard uses routes found in the backend source:
