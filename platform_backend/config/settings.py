@@ -15,7 +15,14 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-me-in-production-4s
 
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if host.strip()
+]
+VERCEL_BACKEND_HOST = 'platformbackend-nine.vercel.app'
+if VERCEL_BACKEND_HOST not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(VERCEL_BACKEND_HOST)
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -98,7 +105,7 @@ MPESA_CONSUMER_SECRET = os.getenv('MPESA_CONSUMER_SECRET', '')
 MPESA_SHORTCODE = os.getenv('MPESA_SHORTCODE', '')
 MPESA_PASSKEY = os.getenv('MPESA_PASSKEY', '')
 MPESA_PAYMENTS_ENABLED = os.getenv('MPESA_PAYMENTS_ENABLED', 'false').lower() == 'true'
-FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL')
+FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'http://127.0.0.1:5173')
 
 SMS_WEBHOOK_TOKEN = os.getenv('SMS_WEBHOOK_TOKEN', '')
 USSD_WEBHOOK_TOKEN = os.getenv('USSD_WEBHOOK_TOKEN', '')
