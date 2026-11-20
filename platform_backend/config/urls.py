@@ -2,13 +2,24 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import JsonResponse
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
 
+
+def api_root(_request):
+    return JsonResponse({
+        'service': 'MediConnect API',
+        'docs': '/api/docs/',
+        'schema': '/api/schema/',
+    })
+
+
 urlpatterns = [
+    path('', api_root, name='api-root'),
     path('admin/', admin.site.urls),
     # API
     path('api/auth/', include('accounts.urls')),
