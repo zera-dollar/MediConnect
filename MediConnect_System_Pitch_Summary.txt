@@ -1,7 +1,7 @@
 MEDICONNECT
 System Overview and Pitch Brief
 
-Prepared for presentation: November 19, 2026
+Prepared for presentation: November 20, 2026
 
 
 1. THE SHORT VERSION
@@ -133,6 +133,18 @@ blood, beds, and equipment. Resource lists can be searched and filtered by
 hospital or type, and ranked by reported availability. Selecting a hospital
 offers appointment and ambulance request actions for that facility.
 
+The operational dashboards are also role-specific and API-backed. Platform
+administrators see facility and service-level indicators; hospital
+administrators see facility staffing, bids, referrals, assignments, transport,
+and resource alerts; doctors and specialists see open opportunities,
+appointment requests, assignments, and credential status; nurses focus on
+triage referrals, appointment requests, assignments, and clinical resources;
+and hospital staff see facility operations relevant to their access. Each
+workspace brings priority work, recent notifications, and task shortcuts into
+one view. Metrics distinguish loading or unavailable data from a reported
+zero. The shared navigation groups tools by task, adapts to mobile screens,
+and provides account sign-out.
+
 Patient appointment requests record the patient's name and at least one
 contact method (email or phone), along with the selected professional,
 requested date/time, and duration. A hospital can optionally be selected; in
@@ -146,12 +158,13 @@ administrators can review activity across users. These activity records
 complement resource-specific transaction history; they are not clinical
 records.
 
-Other role-specific workspaces include screens for ICU resources, oxygen,
-resource management, resource transaction history, analytics, reports,
-staffing, notifications, hospital maps, ambulance requests, and account
-settings. Interfacility referrals let source-hospital nurses and staff submit a
-structured triage summary; a receiving-facility manager can accept, reserve a
-matching resource, and create a linked ambulance request.
+Operational tools include oxygen monitoring, general resource management
+(including resources classified as ICU), resource transaction history,
+analytics, reports, staffing, notifications, hospital maps, ambulance
+requests, and account settings. There is no separate ICU dashboard.
+Interfacility referrals let source-hospital nurses and authorized staff submit
+a structured triage summary; a receiving-facility manager can accept, reserve
+a matching resource, and create a linked ambulance request.
 
 E. Care coordination and integration foundation
 
@@ -183,7 +196,8 @@ disabled.
 
 1. A visitor opens the public MediConnect landing page in a browser-based
    React and TypeScript frontend. After sign-in, the user is directed to a
-   dashboard tailored to their role.
+   role-specific dashboard with task shortcuts and operational indicators
+   drawn from endpoints available to that role.
 2. The frontend calls the Django REST API over HTTP. The API is divided into
    modules for accounts, hospitals, contracts, resources, notifications, and
    ambulance requests.
@@ -215,7 +229,9 @@ continuous fleet feed. Ambulance provider integrations are not present.
 - Accountability: resource adjustments retain a transaction record with the
   user, quantities, timestamp, and reason.
 - Role-aware collaboration: users see and manage workflows relevant to their
-  role and hospital membership.
+  role and hospital membership. Dashboards surface actionable work queues,
+  recent notifications, and task shortcuts without replacing backend access
+  controls.
 - Patient-facing coordination: patients can find nearby hospital listings,
   review reported resources, and submit appointment or transport requests.
 - Interfacility handoffs: structured triage, a receiving-facility decision,
@@ -236,16 +252,19 @@ continuous fleet feed. Ambulance provider integrations are not present.
 7. CURRENT PRODUCT STATUS AND IMPORTANT LIMITS
 
 The current codebase contains a functional web application and Django REST
-backend for the workflows described above. It is best presented as a
-prototype or early-stage product pending deployment and validation with
+backend for the workflows described above. The shared workspace has a
+healthcare-oriented visual refresh, responsive task-grouped navigation, and
+distinct operational dashboards for each account role. It is best presented
+as a prototype or early-stage product pending deployment and validation with
 participating hospitals.
 
 Be precise in the pitch:
 
 - The public landing page includes an illustrative resource overview, not live
-  hospital measurements. The frontend can also run dashboards with sample
-  data, clearly labeled "Sample data - not live." Live hospital data appears
-  only after signing in to a configured backend with connected facility data.
+  hospital measurements. Some disconnected frontend views can run with sample
+  data, clearly labeled "Sample data - not live." Signed-in dashboard
+  indicators use the configured API; facility measurements still depend on
+  accurate and timely hospital updates.
 - Resource levels are not automatically sensed. The application stores
   operational values supplied through its API; updates may be entered
   manually unless an integration is later built.
@@ -315,20 +334,23 @@ Keep the demo transparent and focused:
 
 1. Show the sign-in/connect experience and say whether you are using sample
    data or a live configured backend.
-2. Show the public landing page, then the patient dashboard's nearby
+2. Show the public landing page and the role-specific workspace. Use an
+   administrator, hospital manager, clinician, nurse, or staff account to
+   show how metrics and priority tasks vary by access.
+3. Show the patient dashboard's nearby
    hospitals and reported resource availability. Explain that the landing
    page's visual resource overview is illustrative, not live data.
-3. Demonstrate submitting an appointment request with patient contact details
+4. Demonstrate submitting an appointment request with patient contact details
    and a selected professional. If choosing a hospital, explain the hospital
    affiliation requirement.
-4. Open the staffing marketplace. Show a contract, a professional bid, and
+5. Open the staffing marketplace. Show a contract, a professional bid, and
    how a hospital administrator reviews it.
-5. Show a resource record and demonstrate an authorized stock adjustment.
+6. Show a resource record and demonstrate an authorized stock adjustment.
    Point out the transaction history and low-stock alert behavior.
-6. Submit a demonstration interfacility referral, explain that acceptance
+7. Submit a demonstration interfacility referral, explain that acceptance
    reserves a resource and creates a linked dispatch request, and show the
    single-use driver PWA location flow without using real patient data.
-7. Show user activity history and the read-only ledger, then reports and
+8. Show user activity history and the read-only ledger, then reports and
    hourly burn-rate estimates. Explain that burn rates require sufficient
    snapshot history and are estimates, not predictions.
 
@@ -386,4 +408,6 @@ API documentation: OpenAPI, Swagger UI, and ReDoc.
 Development database: SQLite or Compose PostgreSQL/TimescaleDB + Redis.
 Background jobs: Celery.
 External map features: optional Google Maps configuration.
+Development demo data: synthetic records; `manage.py seed_mvp_demo_data`
+requires the core sample facilities and refuses to run when `DEBUG` is off.
 
