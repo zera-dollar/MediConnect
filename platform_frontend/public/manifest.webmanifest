@@ -1,0 +1,17 @@
+{
+  "name": "MediConnect Care Platform",
+  "short_name": "MediConnect",
+  "description": "Healthcare coordination for patients and care teams.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7faf9",
+  "theme_color": "#173b3d",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

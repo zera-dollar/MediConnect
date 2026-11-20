@@ -21,6 +21,13 @@ class Appointment(models.Model):
         on_delete=models.PROTECT,
         related_name='appointments_as_professional',
     )
+    hospital = models.ForeignKey(
+        'hospitals.Hospital',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='appointments',
+    )
     patient_name = models.CharField(max_length=150)
     patient_email = models.EmailField(blank=True)
     patient_phone = models.CharField(max_length=20, blank=True)

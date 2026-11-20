@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { Activity, ArrowLeft, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { login } from '../lib/api'
+import { dashboardPathForRole } from '../lib/roleDashboard'
 import { useAuthStore } from '../store/auth'
 
 export async function clearCachedAccountData(queryClient: QueryClient): Promise<void> {
@@ -15,15 +16,19 @@ export function ConnectPage() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const setSession = useAuthStore((state) => state.setSession)
+  const user = useAuthStore((state) => state.user)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  useEffect(() => {
+    if (user) navigate(dashboardPathForRole(user.role), { replace: true })
+  }, [navigate, user])
+
   const mutation = useMutation({
     mutationFn: () => login(email.trim(), password),
     onSuccess: async (session) => {
       await clearCachedAccountData(queryClient)
       setSession(session.access, session.user, session.refresh)
-      const returnTo = (location.state as { from?: string } | null)?.from
-      navigate(returnTo ?? '/', { replace: true })
+      navigate(dashboardPathForRole(session.user.role), { replace: true })
     },
   })
 
@@ -36,16 +41,16 @@ export function ConnectPage() {
     <main className="flex min-h-screen items-center justify-center bg-canvas px-5 py-10">
       <div className="w-full max-w-md">
         <Link to="/" className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-muted transition hover:text-ink">
-        <ArrowLeft size={16} aria-hidden="true" /> Back to dashboard
+        <ArrowLeft size={16} aria-hidden="true" />         Back to home
         </Link>
         <section className="rounded-xl border border-black/[0.06] bg-white p-7 shadow-panel sm:p-9">
           <div className="mb-7 flex h-12 w-12 items-center justify-center rounded-lg bg-mint text-forest">
             <Activity size={23} aria-hidden="true" />
           </div>
           <p className="text-xs font-bold uppercase text-forest">MediConnect</p>
-          <h1 className="mt-2 text-2xl font-semibold text-ink">Connect hospital data</h1>
+          <h1 className="mt-2 text-2xl font-semibold text-ink">Sign in to MediConnect</h1>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Sign in to manage staffing, hospital resources, notifications, and your profile.
+            Access the dashboard and tools for your role.
           </p>
 
           {(location.state as { registered?: boolean } | null)?.registered && (

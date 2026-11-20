@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions
 from rest_framework.exceptions import PermissionDenied
 
+from hospitals.models import HospitalStaff
 from .models import Appointment
 from .serializers import (
     AppointmentSerializer,
@@ -16,17 +17,27 @@ User = get_user_model()
 class HealthcareProfessionalListView(generics.ListAPIView):
     serializer_class = HealthcareProfessionalSerializer
     permission_classes = [permissions.IsAuthenticated]
-    queryset = User.objects.filter(
-        is_active=True,
-        role__in=HEALTHCARE_ROLES,
-        availability_status='AVAILABLE',
-    ).order_by('last_name', 'first_name', 'email')
+    def get_queryset(self):
+        queryset = User.objects.filter(
+            is_active=True,
+            role__in=HEALTHCARE_ROLES,
+            availability_status='AVAILABLE',
+        )
+        hospital_id = self.request.query_params.get('hospital')
+        if hospital_id:
+            queryset = queryset.filter(
+                pk__in=HospitalStaff.objects.filter(
+                    hospital_id=hospital_id,
+                    is_active=True,
+                ).values_list('user_id', flat=True),
+            )
+        return queryset.order_by('last_name', 'first_name', 'email')
 
 
 class AppointmentListCreateView(generics.ListCreateAPIView):
     serializer_class = AppointmentSerializer
     permission_classes = [permissions.IsAuthenticated]
-    queryset = Appointment.objects.select_related('patient', 'professional')
+    queryset = Appointment.objects.select_related('patient', 'professional', 'hospital')
 
     def get_queryset(self):
         user = self.request.user

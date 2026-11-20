@@ -12,7 +12,7 @@ import {
   uploadProfessionalDocument,
 } from '../lib/api'
 import { useAuthStore } from '../store/auth'
-import type { ChangePasswordRequest, UserProfileUpdate } from '../types'
+import type { ChangePasswordRequest, CredentialVerificationStatus, UserProfileUpdate } from '../types'
 import { Card, CardHeader, CardTitle } from './ui/card'
 import { WorkspaceNavigation } from './WorkspaceNavigation'
 
@@ -86,6 +86,21 @@ export function validatePasswordForm(form: PasswordForm): string | null {
   if (form.new_password !== form.new_password_confirm) return 'New password entries do not match.'
   if (form.old_password === form.new_password) return 'Choose a new password different from your current password.'
   return null
+}
+
+export function credentialStatusLabel(status: CredentialVerificationStatus | undefined): string {
+  switch (status) {
+    case 'VERIFIED':
+      return 'Verified'
+    case 'PENDING_EXTERNAL_ACCESS':
+      return 'Waiting for authorized KMPDC/registry access'
+    case 'PENDING':
+      return 'Queued for verification'
+    case 'REJECTED':
+      return 'Verification rejected'
+    default:
+      return 'Not submitted'
+  }
 }
 
 export function SettingsLoadingState() {
@@ -374,13 +389,18 @@ export function SystemSettingsDashboard() {
               </Card>
 
               <Card className="p-5 sm:p-7">
-                <CardHeader><div><CardTitle>Professional documents</CardTitle><p className="mt-1 text-xs text-muted">Upload license or supporting files for account verification.</p></div></CardHeader>
+                <CardHeader><div><CardTitle>Professional credentials</CardTitle><p className="mt-1 text-xs text-muted">Upload professional documents and track verification status. Automated KMPDC checks remain pending until authorized API access is configured.</p></div></CardHeader>
+                {profileQuery.data && (
+                  <div className="mt-4 rounded-md bg-canvas px-3 py-2.5 text-sm" role="status">
+                    Account verification: <strong>{credentialStatusLabel(profileQuery.data.verification_status)}</strong>
+                  </div>
+                )}
                 {documentsQuery.isLoading && <p className="mt-4 text-sm text-muted" role="status">Loading documents…</p>}
                 {documentsQuery.isError && <p className="mt-4 text-sm text-[#9d4937]" role="alert">Professional documents could not be loaded.</p>}
                 <div className="mt-4 divide-y divide-black/[0.06]">
                   {(documentsQuery.data ?? []).map((document) => (
                     <div key={document.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm">
-                      <div><a href={new URL(document.file, import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api').toString()} target="_blank" rel="noreferrer" className="font-medium text-forest hover:underline">{document.document_type} document</a><p className="mt-1 text-xs text-muted">{document.description || 'No description'} · {document.is_verified ? 'Verified' : 'Pending verification'}</p></div>
+                      <div><a href={new URL(document.file, import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api').toString()} target="_blank" rel="noreferrer" className="font-medium text-forest hover:underline">{document.document_type} document</a><p className="mt-1 text-xs text-muted">{document.description || 'No description'} · {credentialStatusLabel(document.verification_status)}</p></div>
                     </div>
                   ))}
                   {documentsQuery.data?.length === 0 && <p className="py-3 text-sm text-muted">No documents uploaded yet.</p>}

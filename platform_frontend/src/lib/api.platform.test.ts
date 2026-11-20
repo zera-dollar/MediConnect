@@ -24,7 +24,9 @@ import {
   createAmbulanceRequest,
   createBid,
   dispatchAmbulanceRequest,
+  createAppointment,
   getContracts,
+  getHealthcareProfessionals,
   getNotifications,
   getNotificationPreferences,
   getAmbulanceRequests,
@@ -152,6 +154,37 @@ describe('MediConnect platform API', () => {
       longitude: 36.821235,
       eta_minutes: 4,
     })
+  })
+
+  it('scopes appointment professionals and booking payloads to the selected hospital', async () => {
+    const professionals = [{ id: 8, full_name: 'Alex Doctor' }]
+    get.mockResolvedValue({ data: { results: professionals, next: null } })
+    post.mockImplementation(async (path: string, payload: unknown) => ({ data: { path, payload } }))
+
+    await expect(getHealthcareProfessionals(42)).resolves.toEqual(professionals)
+    await expect(createAppointment({
+      professional: 8,
+      hospital: 42,
+      patient_name: 'Pat Patient',
+      patient_email: 'patient@example.test',
+      patient_phone: '',
+      start_datetime: '2027-01-01T10:00:00Z',
+      duration_minutes: 30,
+    })).resolves.toEqual({
+      path: 'appointments/bookings/',
+      payload: {
+        professional: 8,
+        hospital: 42,
+        patient_name: 'Pat Patient',
+        patient_email: 'patient@example.test',
+        patient_phone: '',
+        start_datetime: '2027-01-01T10:00:00Z',
+        duration_minutes: 30,
+      },
+    })
+
+    expect(get).toHaveBeenCalledWith('appointments/professionals/?hospital=42')
+    expect(post).toHaveBeenCalledWith('appointments/bookings/', expect.objectContaining({ hospital: 42 }))
   })
 
   it('loads the resource catalog including categories without stock records', async () => {

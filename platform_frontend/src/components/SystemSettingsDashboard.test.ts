@@ -6,6 +6,7 @@ import { DashboardLoadingFallback } from '../App'
 import {
   SettingsErrorNotice,
   SettingsLoadingState,
+  credentialStatusLabel,
   profileFormToUpdate,
   validatePasswordForm,
   validateProfileForm,
@@ -51,5 +52,11 @@ describe('System Settings route and validation', () => {
     expect(loading).toContain('role="status"')
     expect(error).toContain('role="alert"')
     expect(error).toContain('>Retry</button>')
+  })
+
+  it('distinguishes credential verification from pending external access', () => {
+    expect(credentialStatusLabel('VERIFIED')).toBe('Verified')
+    expect(credentialStatusLabel('PENDING_EXTERNAL_ACCESS')).toContain('authorized KMPDC/registry access')
+    expect(credentialStatusLabel('REJECTED')).toBe('Verification rejected')
   })
 })

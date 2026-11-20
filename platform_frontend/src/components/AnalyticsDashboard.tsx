@@ -22,7 +22,7 @@ import {
   YAxis,
 } from 'recharts'
 import { Link } from 'react-router-dom'
-import { getHospitalResources, getOxygenSupplies } from '../lib/api'
+import { getHospitalResources, getOxygenSupplies, getResourceBurnRates } from '../lib/api'
 import {
   buildAnalyticsCsv,
   buildOxygenAnalytics,
@@ -114,6 +114,11 @@ export function AnalyticsDashboard() {
     queryFn: getOxygenSupplies,
     enabled: isLive,
   })
+  const burnRatesQuery = useQuery({
+    queryKey: ['resource-burn-rates', 24],
+    queryFn: () => getResourceBurnRates(24),
+    enabled: isLive,
+  })
 
   const resources = resourcesQuery.data ?? []
   const oxygen = oxygenQuery.data ?? []
@@ -123,13 +128,23 @@ export function AnalyticsDashboard() {
   )
   const filteredResources = useMemo(() => filterAnalyticsByFacility(resources, facility), [resources, facility])
   const filteredOxygen = useMemo(() => filterAnalyticsByFacility(oxygen, facility), [oxygen, facility])
+  const burnRates = useMemo(
+    () => (burnRatesQuery.data?.results ?? [])
+      .filter((item) => facility === 'all' || item.hospital_name === facility)
+      .sort((first, second) => {
+        if (first.projected_hours_remaining === null) return second.projected_hours_remaining === null ? 0 : 1
+        if (second.projected_hours_remaining === null) return -1
+        return first.projected_hours_remaining - second.projected_hours_remaining
+      }),
+    [burnRatesQuery.data, facility],
+  )
   const summary = useMemo(() => summarizeAnalytics(filteredResources, filteredOxygen), [filteredResources, filteredOxygen])
   const categoryData = useMemo(() => groupResourcesByCategory(filteredResources), [filteredResources])
   const oxygenData = useMemo(() => buildOxygenAnalytics(filteredOxygen), [filteredOxygen])
   const loading = isLive && (resourcesQuery.isLoading || oxygenQuery.isLoading)
   const hasError = isLive && (resourcesQuery.isError || oxygenQuery.isError)
   const hasAnyRecords = filteredResources.length > 0 || filteredOxygen.length > 0
-  const busy = resourcesQuery.isFetching || oxygenQuery.isFetching
+  const busy = resourcesQuery.isFetching || oxygenQuery.isFetching || burnRatesQuery.isFetching
 
   async function signOut() {
     await queryClient.cancelQueries()
@@ -138,7 +153,7 @@ export function AnalyticsDashboard() {
   }
 
   async function refresh() {
-    await Promise.all([resourcesQuery.refetch(), oxygenQuery.refetch()])
+    await Promise.all([resourcesQuery.refetch(), oxygenQuery.refetch(), burnRatesQuery.refetch()])
   }
 
   function exportCsv() {
@@ -260,6 +275,7 @@ export function AnalyticsDashboard() {
               {loading && <AnalyticsLoadingState />}
               {resourcesQuery.isError && <AnalyticsApiError title="Resource inventory could not be loaded." onRetry={() => void resourcesQuery.refetch()} />}
               {oxygenQuery.isError && <AnalyticsApiError title="Oxygen supply data could not be loaded." onRetry={() => void oxygenQuery.refetch()} />}
+              {burnRatesQuery.isError && <AnalyticsApiError title="Resource burn-rate history could not be loaded." onRetry={() => void burnRatesQuery.refetch()} />}
               {hasError && hasAnyRecords && (
                 <p className="mt-3 text-xs text-[#8f4635]" role="status">Partial snapshot: charts and totals include only successfully loaded records.</p>
               )}
@@ -274,6 +290,38 @@ export function AnalyticsDashboard() {
                     <MetricCard label="Low / critical stock" value={`${summary.lowStockRecords} / ${summary.criticalRecords}`} detail="Resource records flagged by backend" icon={AlertTriangle} tone={summary.criticalRecords ? 'coral' : 'amber'} />
                     <MetricCard label="Oxygen units available" value={`${summary.oxygenAvailableUnits.toLocaleString()} / ${summary.oxygenUnits.toLocaleString()}`} detail={`${summary.lowOxygenRecords} oxygen records marked low`} icon={Droplets} tone={summary.lowOxygenRecords ? 'amber' : 'green'} />
                   </div>
+
+                  <Card className="mt-5 p-5">
+                    <CardHeader>
+                      <div><CardTitle>Resource burn rate</CardTitle><p className="mt-1 text-xs text-muted">Estimated from hourly snapshots over the last {burnRatesQuery.data?.lookback_hours ?? 24} hours. Projections require at least one hour of history.</p></div>
+                    </CardHeader>
+                    {burnRatesQuery.isLoading ? (
+                      <p className="mt-4 text-sm text-muted" role="status">Loading time-series history…</p>
+                    ) : burnRates.length ? (
+                      <div className="mt-4 overflow-x-auto">
+                        <table className="w-full min-w-[620px] text-left text-xs">
+                          <thead className="border-b border-[#e5ece7] text-muted">
+                            <tr><th className="py-2 pr-3 font-semibold">Facility</th><th className="py-2 pr-3 font-semibold">Resource</th><th className="py-2 pr-3 font-semibold">Burn / hour</th><th className="py-2 pr-3 font-semibold">Projected stock remaining</th><th className="py-2 font-semibold">History</th></tr>
+                          </thead>
+                          <tbody>
+                            {burnRates.map((item) => (
+                              <tr key={item.resource_id} className="border-b border-[#eef2ef] last:border-0">
+                                <td className="py-3 pr-3 font-medium">{item.hospital_name}</td>
+                                <td className="py-3 pr-3">{item.resource_type_name}</td>
+                                <td className="py-3 pr-3">{item.sufficient_history && item.burn_rate_per_hour !== null ? `${item.burn_rate_per_hour.toLocaleString()} / hour` : 'Insufficient history'}</td>
+                                <td className={`py-3 pr-3 ${item.projected_hours_remaining !== null && item.projected_hours_remaining < 24 ? 'font-semibold text-[#a9503d]' : ''}`}>
+                                  {item.projected_hours_remaining === null ? item.sufficient_history ? 'No net depletion' : 'Not available' : `${item.projected_hours_remaining.toLocaleString()} hours`}
+                                </td>
+                                <td className="py-3">{item.sample_count} samples · {item.observed_hours}h</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="mt-4 rounded-md bg-canvas p-3 text-xs leading-5 text-muted">No resource history is available for this facility yet. Burn-rate estimates appear after snapshots span at least one hour.</p>
+                    )}
+                  </Card>
 
                   <div className="mt-5 grid gap-4 xl:grid-cols-2">
                     <Card className="p-5">

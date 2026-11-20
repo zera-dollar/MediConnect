@@ -171,6 +171,15 @@ export function HospitalMapDashboard() {
                       <span>
                         <span className="flex items-center gap-2 font-semibold text-ink"><Building2 size={16} aria-hidden="true" />{hospital.name}</span>
                         <span className="mt-1 block text-sm text-muted">{hospital.city}, {hospital.country}</span>
+                        {(hospital.facility_level || hospital.county || hospital.ownership_type || hospital.master_facility_code) && (
+                          <span className="mt-1 block text-[11px] leading-5 text-muted">
+                            {hospital.facility_level && `Level ${hospital.facility_level}`}
+                            {hospital.county && `${hospital.facility_level ? ' · ' : ''}${hospital.county}${hospital.county_rank ? ` (#${hospital.county_rank})` : ''}`}
+                            {hospital.sub_county && ` · ${hospital.sub_county}${hospital.sub_county_rank ? ` (#${hospital.sub_county_rank})` : ''}`}
+                            {hospital.ownership_type && ` · ${hospital.ownership_type}`}
+                            {hospital.master_facility_code && ` · MFL ${hospital.master_facility_code}`}
+                          </span>
+                        )}
                       </span>
                       {distance !== null && <span className="shrink-0 text-sm font-semibold text-forest">{distance.toFixed(1)} km direct</span>}
                       </span>

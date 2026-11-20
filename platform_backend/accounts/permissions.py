@@ -11,6 +11,18 @@ class IsHealthcareProfessional(permissions.BasePermission):
         )
 
 
+class IsVerifiedHealthcareProfessional(IsHealthcareProfessional):
+    """Only verified healthcare professionals can perform restricted actions."""
+
+    message = 'Professional credentials must be verified before bidding.'
+
+    def has_permission(self, request, view):
+        return (
+            super().has_permission(request, view)
+            and request.user.is_verified
+        )
+
+
 class IsHospitalAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
         return (

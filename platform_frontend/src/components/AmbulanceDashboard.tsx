@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity, Ambulance, Clock3, LocateFixed, MapPin, ShieldAlert } from 'lucide-react'
+import { Activity, Ambulance, Clock3, LocateFixed, MapPin, ShieldAlert, Link2 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   cancelAmbulanceRequest,
+  createDriverTelemetrySession,
   createAmbulanceRequest,
   dispatchAmbulanceRequest,
   getAmbulanceRequests,
@@ -22,6 +23,7 @@ import type {
 import { GoogleMapView, type MapPoint } from './GoogleMapView'
 import { WorkspaceNavigation } from './WorkspaceNavigation'
 import { Card, CardHeader, CardTitle } from './ui/card'
+import { useAmbulanceLiveLocation } from '../lib/useAmbulanceLiveLocation'
 
 interface DispatchForm {
   ambulance_code: string
@@ -71,6 +73,7 @@ export function AmbulanceDashboard() {
   const [patientNotes, setPatientNotes] = useState('')
   const [locationError, setLocationError] = useState<string | null>(null)
   const [dispatchForms, setDispatchForms] = useState<Record<number, DispatchForm>>({})
+  const [driverLinks, setDriverLinks] = useState<Record<number, string>>({})
   const [trackingError, setTrackingError] = useState<string | null>(null)
   const hospitalsQuery = useQuery({
     queryKey: ['hospitals'],
@@ -125,6 +128,12 @@ export function AmbulanceDashboard() {
   const cancelMutation = useMutation({
     mutationFn: cancelAmbulanceRequest,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ambulance-requests'] }),
+  })
+  const driverLinkMutation = useMutation({
+    mutationFn: createDriverTelemetrySession,
+    onSuccess: (session, requestId) => {
+      setDriverLinks((current) => ({ ...current, [requestId]: session.driver_url }))
+    },
   })
 
   function useDeviceLocation(onLocated: (point: MapPoint) => void) {
@@ -208,12 +217,23 @@ export function AmbulanceDashboard() {
 
   const trackedRequest = requests.find((request) => request.status === 'EN_ROUTE')
     ?? requests.find((request) => request.status === 'REQUESTED')
+  const liveLocation = useAmbulanceLiveLocation(
+    trackedRequest?.status === 'EN_ROUTE' ? trackedRequest.id : null,
+    token,
+  )
   const hospitalMapPoints = hospitals
-  const trackerOrigin = trackedRequest
-    ? mapPoint(trackedRequest.ambulance_latitude, trackedRequest.ambulance_longitude)
+  const trackerOrigin = liveLocation.location
+    ? { lat: liveLocation.location.latitude, lng: liveLocation.location.longitude }
+    : trackedRequest
+      ? mapPoint(trackedRequest.ambulance_latitude, trackedRequest.ambulance_longitude)
+      : null
+  const trackerRouteOrigin = trackedRequest
+    ? trackedRequest.source_hospital
+      ? mapPoint(trackedRequest.source_hospital.latitude, trackedRequest.source_hospital.longitude)
+      : mapPoint(trackedRequest.pickup_latitude, trackedRequest.pickup_longitude)
     : null
   const trackerDestination = trackedRequest
-    ? mapPoint(trackedRequest.pickup_latitude, trackedRequest.pickup_longitude)
+    ? mapPoint(trackedRequest.destination_hospital_latitude, trackedRequest.destination_hospital_longitude)
     : null
 
   if (!token) {
@@ -371,17 +391,22 @@ export function AmbulanceDashboard() {
                 <section>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <h2 className="text-lg font-semibold">Live request tracking</h2>
-                    <span className="inline-flex items-center gap-2 text-xs text-muted"><span className="h-2 w-2 animate-pulse rounded-full bg-[#3e8a69]" /> Updates every 5 seconds</span>
+                    <span className="inline-flex items-center gap-2 text-xs text-muted">
+                      <span className={`h-2 w-2 rounded-full ${liveLocation.status === 'live' && liveLocation.location ? 'animate-pulse bg-[#3e8a69]' : 'bg-[#d49a36]'}`} />
+                      {liveLocation.location ? `Live GPS · ${new Date(liveLocation.location.received_at).toLocaleTimeString()}` : 'Waiting for driver GPS'}
+                    </span>
                   </div>
                   <GoogleMapView
                     hospitals={hospitalMapPoints}
-                    origin={trackerOrigin}
+                    origin={trackerRouteOrigin}
                     destination={trackerDestination}
-                    originLabel={trackedRequest.ambulance_code || 'Ambulance location'}
-                    destinationLabel={`Pickup: ${trackedRequest.pickup_address}`}
+                    originLabel={trackedRequest.source_hospital?.name ?? `Pickup: ${trackedRequest.pickup_address}`}
+                    destinationLabel={trackedRequest.destination_hospital_name ?? 'Receiving hospital'}
+                    vehicleLocation={trackerOrigin}
+                    vehicleLabel={trackedRequest.ambulance_code || 'Ambulance location'}
                     heightClassName="h-[360px]"
                   />
-                  <p className="mt-2 text-xs text-muted">The vehicle location is entered by the hospital dispatch team and may not be a live GPS feed.</p>
+                  <p className="mt-2 text-xs text-muted">Live location is streamed only while the driver shares it; coordinates expire from the live service after five minutes without an update.</p>
                 </section>
               )}
 
@@ -409,6 +434,9 @@ export function AmbulanceDashboard() {
                       onUpdateVehicleLocation={() => updateVehicleLocation(ambulanceRequest.id)}
                       onStatusChange={(status) => statusMutation.mutate({ requestId: ambulanceRequest.id, status })}
                       onCancel={() => cancelMutation.mutate(ambulanceRequest.id)}
+                      onCreateDriverLink={() => driverLinkMutation.mutate(ambulanceRequest.id)}
+                      driverLink={driverLinks[ambulanceRequest.id]}
+                      driverLinkPending={driverLinkMutation.isPending}
                     />
                   ))}
                   {!requestsQuery.isLoading && !requestsQuery.isError && requests.length === 0 && (
@@ -443,6 +471,9 @@ function AmbulanceRequestCard({
   onUpdateVehicleLocation,
   onStatusChange,
   onCancel,
+  onCreateDriverLink,
+  driverLink,
+  driverLinkPending,
 }: {
   request: AmbulanceRequest
   canDispatch: boolean
@@ -458,6 +489,9 @@ function AmbulanceRequestCard({
   onUpdateVehicleLocation: () => void
   onStatusChange: (status: AmbulanceRequestStatus) => void
   onCancel: () => void
+  onCreateDriverLink: () => void
+  driverLink?: string
+  driverLinkPending: boolean
 }) {
   const patientOwnsRequest = request.patient === currentUserId
   return (
@@ -514,6 +548,9 @@ function AmbulanceRequestCard({
             <input aria-label="Updated ETA minutes" type="number" min={0} max={1440} placeholder="ETA minutes" value={form.eta_minutes} onChange={(event) => onFormChange({ eta_minutes: event.target.value })} className="h-9 rounded border border-[#d8e0db] px-2 text-sm" />
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={onCreateDriverLink} disabled={driverLinkPending} className="inline-flex items-center gap-1.5 rounded border border-[#d8e0db] bg-white px-3 py-2 text-xs font-semibold disabled:opacity-60">
+              <Link2 size={14} aria-hidden="true" /> {driverLinkPending ? 'Creating link…' : 'Create one-time driver link'}
+            </button>
             <button type="button" onClick={onUseVehicleLocation} className="inline-flex items-center gap-1.5 rounded border border-[#d8e0db] bg-white px-3 py-2 text-xs font-semibold">
               <LocateFixed size={14} aria-hidden="true" /> Get current location
             </button>
@@ -527,6 +564,13 @@ function AmbulanceRequestCard({
               Cancel dispatch
             </button>
           </div>
+          {driverLink && (
+            <div className="mt-3 rounded border border-[#d8e0db] bg-white p-3">
+              <p className="text-xs font-semibold text-ink">Share once with the assigned driver</p>
+              <a className="mt-1 block break-all text-xs text-forest underline" href={driverLink} rel="noreferrer" target="_blank">{driverLink}</a>
+              <p className="mt-1 text-[11px] leading-5 text-muted">The link expires in up to eight hours and can be exchanged only once. Creating a replacement link revokes the previous one.</p>
+            </div>
+          )}
         </div>
       )}
 

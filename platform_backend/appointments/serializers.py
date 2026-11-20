@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import serializers
 
+from hospitals.models import Hospital, HospitalStaff
 from .models import Appointment
 
 
@@ -21,6 +22,12 @@ class HealthcareProfessionalSerializer(serializers.ModelSerializer):
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
+    hospital = serializers.PrimaryKeyRelatedField(
+        queryset=Hospital.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+    )
+    hospital_name = serializers.CharField(source='hospital.name', read_only=True, allow_null=True)
     professional = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.filter(
             is_active=True,
@@ -49,6 +56,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'professional_name',
             'professional_role',
             'professional_specialization',
+            'hospital',
+            'hospital_name',
             'patient_name',
             'patient_email',
             'patient_phone',
@@ -71,5 +80,14 @@ class AppointmentSerializer(serializers.ModelSerializer):
         if attrs['start_datetime'] <= timezone.now():
             raise serializers.ValidationError({
                 'start_datetime': 'Choose a future date and time.',
+            })
+        hospital = attrs.get('hospital')
+        if hospital and not HospitalStaff.objects.filter(
+            user=attrs['professional'],
+            hospital=hospital,
+            is_active=True,
+        ).exists():
+            raise serializers.ValidationError({
+                'professional': 'Choose a professional affiliated with the selected hospital.',
             })
         return attrs

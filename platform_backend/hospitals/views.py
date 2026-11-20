@@ -46,6 +46,26 @@ class HospitalViewSet(viewsets.ModelViewSet):
         serializer = DepartmentSerializer(depts, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'], url_path='mine')
+    def mine(self, request):
+        if request.user.is_superuser or request.user.role == 'ADMIN':
+            rows = [
+                {**data, 'role_at_hospital': 'ADMIN'}
+                for data in HospitalListSerializer(self.get_queryset(), many=True).data
+            ]
+            return Response(rows)
+        memberships = HospitalStaff.objects.filter(
+            user=request.user,
+            is_active=True,
+            hospital__is_active=True,
+        ).select_related('hospital')
+        rows = []
+        for membership in memberships:
+            row = HospitalListSerializer(membership.hospital).data
+            row['role_at_hospital'] = membership.role_at_hospital
+            rows.append(row)
+        return Response(rows)
+
     @action(detail=True, methods=['get'])
     def staff(self, request, pk=None):
         hospital = self.get_object()

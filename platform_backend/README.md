@@ -56,6 +56,16 @@
 - In-app notifications for new matching contracts, bid updates, resource alerts, etc.
 - Preference controls per user
 
+### Care Coordination MVP
+- Interfacility referrals with structured triage, receiving-facility review, atomic resource reservation, and linked ambulance requests
+- One-use driver telemetry links, authenticated WebSocket location streaming, and short-lived Redis location data
+- Hourly resource snapshots and a burn-rate endpoint backed by PostgreSQL/TimescaleDB
+- Master facility registry fields and a validated CSV import command
+- Asynchronous credential-verification jobs that remain pending until authorized KMPDC access is available
+- Provider-neutral SMS and USSD callbacks for manager-authorized bed and oxygen count updates
+- Offline app-shell/public-facility caching and idempotent, conflict-checked non-clinical resource updates
+- M-Pesa configuration boundary only; checkout and money movement remain disabled
+
 ---
 
 ## Tech Stack
@@ -67,8 +77,10 @@
 | Auth               | JWT (SimpleJWT)                     |
 | Docs               | drf-spectacular (OpenAPI 3)         |
 | CORS               | django-cors-headers                 |
-| DB (dev)           | SQLite                              |
-| DB (prod)          | PostgreSQL (recommended)            |
+| Real-time          | Django Channels + Redis             |
+| Background jobs    | Celery + Redis                      |
+| DB (local)         | SQLite or Compose PostgreSQL        |
+| Time-series DB     | TimescaleDB (Compose)                |
 | Media              | Pillow + local / S3                 |
 
 ---
@@ -121,17 +133,21 @@ cp .env.example .env
 ### 3. Migrate & Create Superuser
 
 ```bash
-python manage.py makemigrations
 python manage.py migrate
 python manage.py createsuperuser   # uses email
 ```
 
-### 4. (Optional) Seed sample data
+### 4. (Optional) Seed development data
 
 ```bash
-python manage.py shell < scripts/seed_data.py   # if provided
-# or use the admin panel to create hospitals, categories, etc.
+# On a fresh development database only; creates the core sample facilities and accounts.
+python manage.py shell < scripts/seed_data.py
+python manage.py seed_mvp_demo_data
 ```
+
+The MVP seeder requires the sample facilities created by `scripts/seed_data.py` and refuses to run when `DEBUG` is disabled. It adds clearly synthetic patient, nurse, doctor, facility-manager, and staff accounts; a sample appointment; a pending interfacility referral; an en-route ambulance request; facility-registry demo fields; and two hourly resource snapshots for burn-rate testing. Referral acceptance through the receiving facility account exercises the resource reservation workflow.
+
+On its first run, `seed_mvp_demo_data` prints a randomly generated, one-time password for any new demo accounts; all newly created accounts share it. Save it securely. The command never resets passwords for accounts that already exist. Demo accounts and data are for local development only. It does not fabricate credential verification, SMS/USSD activity, or M-Pesa transactions; those require their respective external configuration.
 
 ### 5. Run
 
@@ -143,6 +159,19 @@ python manage.py runserver
 - Swagger UI: http://127.0.0.1:8000/api/docs/
 - ReDoc: http://127.0.0.1:8000/api/redoc/
 - Admin: http://127.0.0.1:8000/admin/
+
+### Run the full local MVP stack
+
+From the repository root, copy `.env.example` to `.env`, then start PostgreSQL/TimescaleDB, Redis, Daphne, Celery worker, and Celery beat:
+
+```bash
+docker compose up --build
+docker compose exec backend python manage.py migrate
+docker compose exec backend python manage.py createsuperuser
+docker compose exec backend python manage.py setup_resource_snapshot_hypertable
+```
+
+The hourly snapshot task is scheduled by Celery beat. The hypertable setup command requires the TimescaleDB extension and should be run after migrations. Local Compose credentials are for development only.
 
 ---
 
@@ -162,7 +191,13 @@ All endpoints are under `/api/` and require a JWT Bearer token except registrati
 | `/api/resources/`       | resources    | Categories, types, stocks, blood, O₂ |
 | `/api/notifications/`   | notifications| In-app notifications                 |
 | `/api/ambulance/`      | ambulances   | Patient transport requests and tracking |
+| `/api/ambulance/referrals/` | ambulances | Interfacility clinical referrals and acceptance |
 | `/api/appointments/`   | appointments | Professional listings and patient bookings |
+| `/api/history/`       | activity_ledger | Authenticated user activity history   |
+| `/api/ledger/`        | activity_ledger | Read-only activity ledger              |
+| `/api/driver-telemetry/` | driver_telemetry | One-use driver session and token exchange |
+| `/api/integrations/`  | integrations | SMS/USSD callbacks and offline resource sync |
+| `/api/resources/burn-rates/` | resources | Snapshot-based resource depletion estimates |
 
 ---
 
@@ -276,6 +311,26 @@ Body for review:
 {"status": "ACCEPTED", "review_notes": "Looking forward to working with you."}
 ```
 
+### Interfacility referrals
+
+- `GET/POST /api/ambulance/referrals/` – source-hospital nurses or staff create structured referrals; facility members can view referrals for their facilities.
+- `POST /api/ambulance/referrals/{id}/accept/` – receiving hospital admins, managers, or coordinators atomically reserve one matching resource record and create a linked ambulance request.
+- Cancelling an accepted linked request releases the reservation and records a resource transaction.
+- `GET /api/ambulance/requests/` exposes source and destination coordinates for referral transport maps.
+
+The triage summary is clinical information: use only with authorized accounts, enter only transfer-relevant details, and do not cache it for offline use.
+
+### Telemetry, fallback, and integrations
+
+- `POST /api/driver-telemetry/sessions/` creates a one-use driver URL for an authorized, en-route request; `POST /api/driver-telemetry/exchange/` exchanges it once for a short-lived driver token.
+- The driver PWA streams GPS over WebSocket to Redis. Location values expire after five minutes without an update and are not stored as route history. Patient and authorized source/receiving facility members can view a request's live stream.
+- `POST /api/integrations/sms/inbound/` and `POST /api/integrations/ussd/callback/` accept normalized, provider-neutral callbacks secured by `X-Webhook-Token`. Structured commands are `BED <facility-code> <resource-id> <available-count>` and `O2 <facility-code> <supply-id> <available-units>`. The sender's phone must match an active facility manager/coordinator account.
+- `POST /api/integrations/resources/offline-updates/` applies authorized queued resource updates using an idempotency key and expected resource timestamp; stale updates return HTTP 409 instead of overwriting newer values.
+- `GET /api/resources/burn-rates/?hours=24` estimates depletion from snapshots and returns no projection until at least two samples span one hour.
+- `MPESA_*` settings define an adapter boundary only. Payment checkout is disabled in this MVP; no charges or money movement occur.
+
+Configure SMS and USSD tokens, gateway credentials, Redis, and KMPDC settings through environment variables. Provider-specific webhook formats still require an adapter; live external services are not configured by default.
+
 ### Resources
 
 | Method | Endpoint                              | Description                     |
@@ -324,6 +379,8 @@ Adjust body example:
 Blood and Oxygen have dedicated models for domain-specific fields (expiry, blood group, cylinder capacity, etc.).
 The migrated Organs category tracks aggregate transplant resource data only. It must not be used to claim donor or organ availability without verified clinical-system data.
 
+Facility registry CSV imports require master facility code, level 1–6, ownership, county/sub-county, and ranking columns. Validate before applying with `python manage.py import_facility_registry registry.csv --dry-run`; then run without `--dry-run` to upsert the records.
+
 ---
 
 ## Notifications
@@ -349,9 +406,17 @@ Hospital staff can only manage requests for hospitals where they have an active 
 ## Appointments
 
 - `GET /api/appointments/professionals/` – list active healthcare professionals currently marked available.
-- `GET/POST /api/appointments/bookings/` – patients list their own requests or submit a booking with the professional, date/time, duration, patient name, and at least one contact method.
+- `GET/POST /api/appointments/bookings/` – patients list their own requests or submit a booking with the professional, optional hospital, date/time, duration, patient name, and at least one contact method.
 
-Patients can view only their own bookings; professionals can view bookings assigned to them, and platform admins can view all bookings. New bookings start with `REQUESTED` status.
+`GET /api/appointments/professionals/?hospital=<id>` filters available professionals to active staff at that hospital. A booking that specifies a hospital must use a professional with an active membership there. Patients can view only their own bookings; professionals can view bookings assigned to them, and platform admins can view all bookings. New bookings start with `REQUESTED` status.
+
+## User History and Activity Ledger
+
+- `GET /api/history/` – list the authenticated user's activity.
+- `GET /api/ledger/` – read the append-only activity ledger.
+- Platform admins can read all users' entries or filter with `?user_id=<id>`. Other users always see only their own entries.
+
+Successful API creates, updates, and deletes are recorded with the event type, endpoint, resource identifier, status code, and timestamp. Successful sign-ins and registrations are also recorded. Request bodies, credentials, and query strings are not stored. Both endpoints are read-only.
 
 ---
 
@@ -375,10 +440,10 @@ All endpoints are tagged and documented with request/response schemas.
 4. Run with Gunicorn + Nginx (or similar).
 5. Enable HTTPS and secure JWT settings (short access token lifetime).
 6. Configure real email backend (SendGrid, SES, etc.) for notifications.
-7. Consider Celery + Redis for async notification delivery and scheduled reminders.
+7. Keep Celery/Redis supervised for credential jobs, urgent-bid SMS, and hourly resource snapshots.
 8. Add rate limiting, monitoring (Sentry), and regular DB backups.
-9. Implement proper document verification workflow (admin approval of ProfessionalDocument).
-10. For real-time bed/oxygen dashboards consider WebSockets (Django Channels) or polling.
+9. Configure authorized KMPDC access before representing uploaded credentials as verified; the current adapter explicitly leaves them pending.
+10. Configure and validate SMS/USSD providers and the driver telemetry workflow with facility partners before production use.
 
 ---
 

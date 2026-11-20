@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.db import transaction
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
@@ -14,8 +15,13 @@ from .serializers import (
     BidReviewSerializer,
     ContractAssignmentSerializer,
 )
-from accounts.permissions import IsHealthcareProfessional, IsHospitalAdmin
+from accounts.permissions import (
+    IsHospitalAdmin,
+    IsVerifiedHealthcareProfessional,
+)
 from notifications.models import Notification
+
+User = get_user_model()
 
 
 @extend_schema_view(
@@ -121,7 +127,7 @@ class BidViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action == 'create':
-            return [permissions.IsAuthenticated(), IsHealthcareProfessional()]
+            return [permissions.IsAuthenticated(), IsVerifiedHealthcareProfessional()]
         if self.action in ('review',):
             return [permissions.IsAuthenticated(), IsHospitalAdmin()]
         return [permissions.IsAuthenticated()]
@@ -168,7 +174,24 @@ class BidViewSet(viewsets.ModelViewSet):
         new_status = serializer.validated_data['status']
         notes = serializer.validated_data.get('review_notes', '')
 
+        if new_status == Bid.Status.ACCEPTED and not bid.bidder.is_verified:
+            return Response(
+                {"detail": "A bid cannot be accepted unless the bidder's credentials are verified."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         with transaction.atomic():
+            if new_status == Bid.Status.ACCEPTED:
+                bidder_is_verified = User.objects.select_for_update().filter(
+                    pk=bid.bidder_id,
+                    is_verified=True,
+                ).exists()
+                if not bidder_is_verified:
+                    return Response(
+                        {"detail": "A bid cannot be accepted unless the bidder's credentials are verified."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
             bid.status = new_status
             bid.reviewed_by = request.user
             bid.reviewed_at = timezone.now()

@@ -4,13 +4,14 @@ export interface ApiUser {
   full_name?: string
   first_name: string
   last_name: string
-  role: string
+  role: UserRole
   phone?: string
   license_number?: string
   specialization?: string
   years_of_experience?: number
   bio?: string
   is_verified?: boolean
+  verification_status?: CredentialVerificationStatus
   preferred_locations?: string[]
   availability_status?: 'AVAILABLE' | 'BUSY' | 'ON_LEAVE' | 'NOT_AVAILABLE'
 }
@@ -51,10 +52,21 @@ export interface Hospital {
   name: string
   city: string
   country: string
+  master_facility_code?: string | null
+  facility_level?: number | null
+  ownership_type?: string
+  county?: string
+  sub_county?: string
+  county_rank?: number | null
+  sub_county_rank?: number | null
   is_active: boolean
   phone?: string
   latitude?: number | string | null
   longitude?: number | string | null
+}
+
+export interface HospitalMembership extends Hospital {
+  role_at_hospital: 'ADMIN' | 'MANAGER' | 'COORDINATOR' | 'STAFF'
 }
 
 export interface Department {
@@ -103,6 +115,31 @@ export interface HospitalResource {
   notes: string
 }
 
+export interface ResourceBurnRate {
+  resource_id: number
+  hospital_id: number
+  hospital_name: string
+  resource_type_id: number
+  resource_type_name: string
+  sufficient_history: boolean
+  sample_count: number
+  observed_hours: number
+  burn_rate_per_hour: number | null
+  projected_hours_remaining: number | null
+  latest_snapshot: {
+    recorded_at: string
+    available_quantity: number
+    total_capacity: number
+    reserved_quantity: number
+  } | null
+}
+
+export interface ResourceBurnRatesResponse {
+  lookback_hours: number
+  minimum_observation_hours: number
+  results: ResourceBurnRate[]
+}
+
 export type ResourceTransactionType = 'ADD' | 'REMOVE' | 'RESERVE' | 'RELEASE' | 'ADJUST' | 'TRANSFER'
 
 export interface ResourceTransaction {
@@ -125,24 +162,6 @@ export interface ResourceAdjustment {
   quantity: number
   reason?: string
   reference?: string
-}
-
-export interface ICUUnit {
-  id: number
-  name: string
-  capacity: number
-  available: number
-  occupied: number
-  reserved: number
-  threshold: number
-}
-
-export interface ICUSummary {
-  capacity: number
-  available: number
-  occupied: number
-  reserved: number
-  occupancyPercent: number
 }
 
 export interface OxygenSupply {
@@ -368,6 +387,64 @@ export interface ProfessionalDocument {
   description: string
   uploaded_at: string
   is_verified: boolean
+  verification_status: CredentialVerificationStatus
+}
+
+export type CredentialVerificationStatus =
+  | 'NOT_SUBMITTED'
+  | 'PENDING'
+  | 'PENDING_EXTERNAL_ACCESS'
+  | 'VERIFIED'
+  | 'REJECTED'
+
+export type ReferralAcuity = 'CRITICAL' | 'EMERGENCY' | 'URGENT' | 'ROUTINE'
+export type ReferralStatus = 'PENDING' | 'ACCEPTED' | 'CANCELLED'
+
+export interface ReferralVitals {
+  systolic_bp?: number
+  diastolic_bp?: number
+  heart_rate?: number
+  respiratory_rate?: number
+  temperature_celsius?: number
+  oxygen_saturation_pct?: number
+}
+
+export interface InterfacilityReferral {
+  id: number
+  source_hospital: number
+  source_hospital_name: string
+  receiving_hospital: number
+  receiving_hospital_name: string
+  patient: number
+  patient_name: string
+  presenting_concern: string
+  acuity: ReferralAcuity
+  vitals: ReferralVitals
+  interventions: string
+  resource_type: number
+  resource_type_name: string
+  resource_quantity: number
+  status: ReferralStatus
+  ambulance_request: number | null
+  ambulance_request_status: AmbulanceRequestStatus | null
+  reservation_transaction: number | null
+  referred_by: number
+  accepted_by: number | null
+  created_at: string
+  updated_at: string
+  accepted_at: string | null
+}
+
+export interface InterfacilityReferralCreate {
+  source_hospital: number
+  receiving_hospital: number
+  patient: number
+  presenting_concern: string
+  acuity: ReferralAcuity
+  vitals: ReferralVitals
+  interventions: string
+  resource_type: number
+  resource_quantity: number
 }
 
 export type AmbulanceRequestStatus =
@@ -388,6 +465,12 @@ export interface AmbulanceRequest {
   destination_hospital_city: string
   destination_hospital_latitude: number | string | null
   destination_hospital_longitude: number | string | null
+  source_hospital: {
+    id: number
+    name: string
+    latitude: number | string | null
+    longitude: number | string | null
+  } | null
   pickup_address: string
   pickup_latitude: number | string
   pickup_longitude: number | string
@@ -443,6 +526,8 @@ export interface Appointment {
   professional_name: string
   professional_role: HealthcareProfessional['role']
   professional_specialization: string
+  hospital: number | null
+  hospital_name: string | null
   patient_name: string
   patient_email: string
   patient_phone: string
@@ -455,6 +540,7 @@ export interface Appointment {
 
 export interface AppointmentCreate {
   professional: number
+  hospital?: number
   patient_name: string
   patient_email: string
   patient_phone: string

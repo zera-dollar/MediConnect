@@ -17,6 +17,9 @@ urlpatterns = [
     path('api/resources/', include('resources.urls')),
     path('api/ambulance/', include('ambulances.urls')),
     path('api/appointments/', include('appointments.urls')),
+    path('api/', include('activity_ledger.urls')),
+    path('api/driver-telemetry/', include('driver_telemetry.urls')),
+    path('api/integrations/', include('integrations.urls')),
     path('api/', include('notifications.urls')),
     # OpenAPI schema & docs
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

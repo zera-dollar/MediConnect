@@ -30,6 +30,7 @@ import type { ResourceStatusFilter } from '../lib/resourceManagement'
 import { useAuthStore } from '../store/auth'
 import type { HospitalResource, ResourceAdjustment, ResourceTransactionType } from '../types'
 import { Card, CardHeader, CardTitle } from './ui/card'
+import { OfflineResourceSyncPanel } from './OfflineResourceSyncPanel'
 
 const sampleResources: HospitalResource[] = [
   {
@@ -438,6 +439,10 @@ export function ResourceManagementDashboard() {
             <div className="flex items-center gap-2"><span className="font-semibold">{isLive ? 'Authenticated session' : 'Demonstration resource inventory'}</span>{!isLive && <span className="rounded bg-white/70 px-2 py-1 text-[10px] font-bold uppercase">Demonstration only</span>}</div>
             <div>{isLive ? (updatedAt ? `Fetched ${updatedAt}` : 'Waiting for resource data') : 'Example figures · no hospital data connected'}</div>
           </div>
+
+          {isLive && user && user.role !== 'PATIENT' && resources.length > 0 && (
+            <OfflineResourceSyncPanel resources={resources} userId={user.id} />
+          )}
 
           {loading && <div className="mt-5 rounded-lg border border-black/[0.06] bg-white px-5 py-8 text-center text-sm text-muted" role="status">Loading hospital resource data…</div>}
           {isLive && resourcesQuery.error && <ErrorMessage error={resourcesQuery.error} onRetry={() => void resourcesQuery.refetch()} />}

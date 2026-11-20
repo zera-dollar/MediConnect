@@ -6,12 +6,12 @@ Prepared for presentation: November 19, 2026
 
 1. THE SHORT VERSION
 
-MediConnect is a healthcare operations platform that brings together three
-important coordination needs: finding qualified clinical staff, understanding
-hospital resource availability, and coordinating patient transport requests.
-It gives hospitals and healthcare professionals a shared digital workspace
-for staffing and operational information, with a web dashboard backed by a
-role-aware API.
+MediConnect is a healthcare coordination platform that brings together
+staffing workflows, hospital-reported resource information, and patient care
+requests. Patients can discover nearby hospitals, review reported resource
+availability, request appointments, and submit transport requests. Hospitals
+and healthcare professionals use role-specific workspaces for staffing and
+operational information, with a web dashboard backed by a role-aware API.
 
 The central idea is simple: hospitals should not have to coordinate urgent
 staffing needs, critical resource updates, and transport requests through
@@ -20,8 +20,8 @@ structured workflow for these tasks, so the right people can see relevant
 information, take an authorized action, and follow what happened.
 
 Suggested one-line pitch:
-"MediConnect helps hospitals coordinate people, essential resources, and
-patient transport through one operational platform."
+"MediConnect helps patients and healthcare teams coordinate care requests,
+staffing, and hospital resources through one role-based platform."
 
 
 2. THE PROBLEM
@@ -55,8 +55,9 @@ hospital information systems, emergency services, or clinical care.
   profile, discover open contracts, bid for work, and track assignments.
 - Hospital dispatch coordinators: receive transport requests for their
   destination hospital and update dispatch, location, ETA, and status.
-- Patients: submit a transport request to a selected hospital and view its
-  progress in the application.
+- Patients: discover nearby hospitals, review facility-reported resources,
+  request an appointment with an available professional, and submit a
+  transport request to a selected hospital.
 - Platform administrators: manage the overall service and its accounts.
 
 Access to key actions is associated with authenticated accounts and roles.
@@ -123,17 +124,66 @@ Users can sign in with email and password, maintain a profile, change a
 password, and (where appropriate) submit professional verification documents.
 The application includes an in-app notification inbox and user preferences.
 
-The web workspace includes screens for ICU resources, oxygen, resource
-management, audit history, analytics, reports, staffing, notifications,
-hospital maps, ambulance requests, and account settings. Analytics and reports
-summarize the current API records; the current backend does not provide
-historical time-series reporting.
+The public landing page explains the system's capabilities and provides
+sign-in and account-creation paths. Once authenticated, users are routed to
+dashboards tailored to their roles. The patient dashboard brings together
+notifications, nearby hospital listings, appointment booking, ambulance
+requests, profile settings, and reported resource availability for oxygen,
+blood, beds, and equipment. Resource lists can be searched and filtered by
+hospital or type, and ranked by reported availability. Selecting a hospital
+offers appointment and ambulance request actions for that facility.
+
+Patient appointment requests record the patient's name and at least one
+contact method (email or phone), along with the selected professional,
+requested date/time, and duration. A hospital can optionally be selected; in
+that case, the professional must have an active staff membership at the
+selected hospital. Patients can view their own requests and their current
+status.
+
+The backend also exposes authenticated user activity history and a read-only,
+append-only activity ledger. Users can review their own activity, while
+administrators can review activity across users. These activity records
+complement resource-specific transaction history; they are not clinical
+records.
+
+Other role-specific workspaces include screens for ICU resources, oxygen,
+resource management, resource transaction history, analytics, reports,
+staffing, notifications, hospital maps, ambulance requests, and account
+settings. Interfacility referrals let source-hospital nurses and staff submit a
+structured triage summary; a receiving-facility manager can accept, reserve a
+matching resource, and create a linked ambulance request.
+
+E. Care coordination and integration foundation
+
+The MVP includes a driver PWA flow based on a single-use link. When a dispatch
+is en route, the driver can open the link and share browser GPS over a
+WebSocket. The current location is published through Redis with a five-minute
+expiry and is not retained as route history. The patient and authorized source
+and receiving facility members can view the live position.
+
+Facilities can be enriched with Master Facility List codes, levels 1-6,
+ownership, county/sub-county, and rankings using a validated CSV import
+command. Professional document uploads enqueue a verification job, but the
+KMPDC adapter deliberately stays pending until authorized provider access is
+available; it does not simulate a verified result.
+
+The service worker caches the app shell and public facility/resource snapshots.
+Authorized users can queue non-clinical resource quantity changes with an
+idempotency key and stale-data conflict check. Patient data and clinical triage
+are excluded from the offline cache. Normalized SMS and USSD callback
+interfaces support structured bed and oxygen count updates from an
+authorized facility manager's registered phone. Provider-specific carrier
+connections still need configuration. Hourly resource snapshots support
+burn-rate estimates after sufficient observation history. M-Pesa settings
+establish a configuration boundary only; checkout and money movement are
+disabled.
 
 
 5. HOW IT WORKS
 
-1. The user accesses MediConnect through a browser-based React and TypeScript
-   frontend.
+1. A visitor opens the public MediConnect landing page in a browser-based
+   React and TypeScript frontend. After sign-in, the user is directed to a
+   dashboard tailored to their role.
 2. The frontend calls the Django REST API over HTTP. The API is divided into
    modules for accounts, hospitals, contracts, resources, notifications, and
    ambulance requests.
@@ -149,11 +199,11 @@ historical time-series reporting.
    API schema is documented with OpenAPI and can be explored through Swagger
    UI or ReDoc.
 
-At present, the development configuration uses SQLite. PostgreSQL is
-recommended for a production deployment. Resource and ambulance views show
-current records rather than receiving continuous device or vehicle telemetry.
-Ambulance location and ETA updates are entered by dispatch staff and polled
-by the frontend while tracking a request.
+Local development can use SQLite or the included Compose stack with
+PostgreSQL/TimescaleDB, Redis, Daphne, and Celery. Hourly snapshots support
+resource depletion estimates. Driver locations can be streamed through the
+browser-based telemetry flow, but they are short-lived and are not a
+continuous fleet feed. Ambulance provider integrations are not present.
 
 
 6. WHAT MAKES THE APPROACH VALUABLE
@@ -166,6 +216,14 @@ by the frontend while tracking a request.
   user, quantities, timestamp, and reason.
 - Role-aware collaboration: users see and manage workflows relevant to their
   role and hospital membership.
+- Patient-facing coordination: patients can find nearby hospital listings,
+  review reported resources, and submit appointment or transport requests.
+- Interfacility handoffs: structured triage, a receiving-facility decision,
+  resource reservation, and linked transport request share one workflow.
+- Resilient update path: public facility data can be cached and authorized
+  non-clinical resource changes can be queued for conflict-checked sync.
+- Read-only activity visibility: authenticated users can inspect their own
+  history, with broader ledger access available to administrators.
 - Configurable resource model: resource categories and types can represent
   different hospital inventories instead of hard-coding every resource into a
   separate interface.
@@ -184,21 +242,40 @@ participating hospitals.
 
 Be precise in the pitch:
 
-- The frontend can run with sample data, but its README identifies that mode
-  as "Sample data - not live." Live hospital data appears only after connecting
-  to a configured backend and signing in.
+- The public landing page includes an illustrative resource overview, not live
+  hospital measurements. The frontend can also run dashboards with sample
+  data, clearly labeled "Sample data - not live." Live hospital data appears
+  only after signing in to a configured backend with connected facility data.
 - Resource levels are not automatically sensed. The application stores
   operational values supplied through its API; updates may be entered
   manually unless an integration is later built.
 - The ambulance workflow is internal to the platform. It is not connected to
-  an ambulance provider, emergency call center, or live vehicle GPS feed.
-  Dispatchers manually provide vehicle location, ETA, and status. It must not
-  be presented as a substitute for contacting local emergency services.
-- Email, SMS, and push preferences exist in the product model, but live
-  delivery depends on configuring and implementing those external channels.
-  The current product includes in-app notifications.
-- Current reports and analytics are based on current API data, not historical
-  trends or complete system-wide audit analytics.
+  an ambulance provider or emergency call center. Dispatchers manage request
+  status and ETA; a driver can share browser GPS through a single-use link.
+  This must not be presented as a substitute for contacting local emergency
+  services.
+- In-app notifications are available. SMS delivery requires the configured
+  gateway; email and push delivery are not configured by default.
+- Hourly resource snapshots provide a basic burn-rate estimate after at least
+  one hour of history. This is not a predictive model, and reports do not
+  represent a complete system-wide audit analysis.
+- Driver GPS sharing requires an en-route dispatch, a single-use link, browser
+  location permission, and network access. The workflow is not connected to
+  fleet hardware or external ambulance dispatch systems; dispatchers must
+  still coordinate through their operations team.
+- KMPDC verification remains pending until authorized API access is supplied.
+  Facility registry data is currently loaded through validated CSV import,
+  rather than a live master-registry connection.
+- SMS/USSD callbacks and outbound SMS are provider-neutral integration
+  boundaries. Live delivery requires provider adapters and credentials.
+- Offline mode caches only public facility/resource data and queues
+  non-clinical resource updates; it does not cache triage or patient records.
+- M-Pesa checkout and money movement are disabled. Configuration variables do
+  not mean that payments are integrated.
+- Patient-facing hospital and resource information depends on facility data
+  and updates. Nearby distance is an estimate based on listed locations and,
+  when the patient opts in, device location; it does not guarantee resource
+  availability or clinical suitability.
 - The current audit screen retrieves up to 50 transactions for a selected
   resource, rather than a complete cross-hospital audit log.
 - The Organs category is a catalog/resource classification only. The system
@@ -238,14 +315,22 @@ Keep the demo transparent and focused:
 
 1. Show the sign-in/connect experience and say whether you are using sample
    data or a live configured backend.
-2. Open the staffing marketplace. Show a contract, a professional bid, and
+2. Show the public landing page, then the patient dashboard's nearby
+   hospitals and reported resource availability. Explain that the landing
+   page's visual resource overview is illustrative, not live data.
+3. Demonstrate submitting an appointment request with patient contact details
+   and a selected professional. If choosing a hospital, explain the hospital
+   affiliation requirement.
+4. Open the staffing marketplace. Show a contract, a professional bid, and
    how a hospital administrator reviews it.
-3. Show a resource record and demonstrate an authorized stock adjustment.
+5. Show a resource record and demonstrate an authorized stock adjustment.
    Point out the transaction history and low-stock alert behavior.
-4. Show the ambulance request flow using a clearly identified demonstration
-   request. Explain that dispatch updates are manually entered in this version.
-5. End with the reports/analytics screens and state that they summarize current
-   data, not historical performance.
+6. Submit a demonstration interfacility referral, explain that acceptance
+   reserves a resource and creates a linked dispatch request, and show the
+   single-use driver PWA location flow without using real patient data.
+7. Show user activity history and the read-only ledger, then reports and
+   hourly burn-rate estimates. Explain that burn rates require sufficient
+   snapshot history and are estimates, not predictions.
 
 Do not display demo figures as if they were live hospital measurements, and do
 not use real patient information in a public presentation.
@@ -254,20 +339,25 @@ not use real patient information in a public presentation.
 10. PITCH SCRIPT (ABOUT ONE MINUTE)
 
 "Hospitals coordinate care through a network of people and essential
-resources, but staffing, resource updates, and transport coordination can be
-split across disconnected processes. MediConnect brings these operational
-workflows together in one web platform.
+resources, but staffing, resource updates, and patient requests can be split
+across disconnected processes. MediConnect brings these workflows together
+in one role-based web platform.
 
 "Hospitals can publish staffing needs and review bids from qualified
 professionals. Teams can maintain visibility into resources such as beds,
 blood, and oxygen, record changes with an audit trail, and receive in-app
-low-stock alerts. Patients can submit transport requests, while authorized
-hospital dispatch staff update request status and ETA.
+low-stock alerts. For hospital-to-hospital transfers, staff can share a
+structured triage handoff, reserve a receiving facility resource on
+acceptance, and coordinate a linked transport request. Patients can find
+nearby hospital listings, review facility-reported resources, request
+appointments with available professionals, and submit transport requests.
 
 "The platform is built with a role-aware Django API and a React dashboard. Our
-current version demonstrates these workflows; live data, device telemetry,
-ambulance-provider connections, and production compliance work are not
-assumed. We are looking for hospital partners to validate a focused pilot,
+MVP also includes short-lived driver-browser GPS telemetry, hourly resource
+snapshots, offline non-clinical resource updates, and provider-neutral SMS and
+USSD boundaries. KMPDC verification remains pending until authorized access is
+configured, M-Pesa payments are disabled, and no ambulance provider is
+connected. We are looking for hospital partners to validate a focused pilot,
 measure operational value, and guide the integrations needed for deployment."
 
 
@@ -293,7 +383,7 @@ Frontend: React 18, TypeScript, Vite.
 Backend: Django and Django REST Framework.
 Authentication: JWT-based sign-in and refresh.
 API documentation: OpenAPI, Swagger UI, and ReDoc.
-Development database: SQLite.
-Production database direction: PostgreSQL.
+Development database: SQLite or Compose PostgreSQL/TimescaleDB + Redis.
+Background jobs: Celery.
 External map features: optional Google Maps configuration.
 

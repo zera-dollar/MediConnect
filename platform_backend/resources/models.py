@@ -129,6 +129,41 @@ class HospitalResource(models.Model):
         return self.resource_type.category.is_critical and self.is_low_stock
 
 
+class HospitalResourceSnapshot(models.Model):
+    """Hourly history of a hospital resource's recorded quantities."""
+    hospital_resource = models.ForeignKey(
+        HospitalResource,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='snapshots',
+    )
+    hospital_resource_id_at_capture = models.BigIntegerField()
+    recorded_at = models.DateTimeField()
+    available_quantity = models.PositiveIntegerField()
+    total_capacity = models.PositiveIntegerField()
+    reserved_quantity = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ['recorded_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['hospital_resource_id_at_capture', 'recorded_at'],
+                name='res_snap_resource_time_uniq',
+            ),
+            models.UniqueConstraint(
+                fields=['id', 'recorded_at'],
+                name='res_snap_id_time_uniq',
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=['recorded_at', 'hospital_resource_id_at_capture'],
+                name='res_snap_time_resource_idx',
+            ),
+        ]
+
+
 class ResourceTransaction(models.Model):
     """Audit log of every change to resource quantities."""
     class TransactionType(models.TextChoices):

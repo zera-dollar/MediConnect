@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type AxiosResponse } from 'axios'
 import { useAuthStore } from '../store/auth'
+import { cacheFacilityData, readCachedFacilityData } from './offlineStore'
 import type {
   AmbulanceDispatch,
   AmbulanceLocationUpdate,
@@ -18,7 +19,10 @@ import type {
   ContractListItem,
   Hospital,
   HospitalDetails,
+  HospitalMembership,
   HospitalResource,
+  InterfacilityReferral,
+  InterfacilityReferralCreate,
   HospitalStaff,
   HealthcareProfessional,
   LoginResponse,
@@ -27,6 +31,7 @@ import type {
   OxygenSupply,
   ProfessionalDocument,
   ResourceAdjustment,
+  ResourceBurnRatesResponse,
   ResourceCategory,
   ResourceTransaction,
   UserRegistration,
@@ -140,11 +145,62 @@ export async function changePassword(request: ChangePasswordRequest): Promise<{ 
 }
 
 export function getHospitals(): Promise<Hospital[]> {
-  return fetchCollection<Hospital>('hospitals/')
+  return fetchCachedFacilityCollection<Hospital>('hospitals/', 'hospitals')
+}
+
+export function getMyHospitals(): Promise<HospitalMembership[]> {
+  return fetchCollection<HospitalMembership>('hospitals/mine/')
+}
+
+export function getInterfacilityReferrals(): Promise<InterfacilityReferral[]> {
+  return fetchCollection<InterfacilityReferral>('ambulance/referrals/')
+}
+
+export async function createInterfacilityReferral(
+  referral: InterfacilityReferralCreate,
+): Promise<InterfacilityReferral> {
+  const response = await api.post<InterfacilityReferral>('ambulance/referrals/', referral)
+  return response.data
+}
+
+export async function acceptInterfacilityReferral(referralId: number): Promise<InterfacilityReferral> {
+  const response = await api.post<InterfacilityReferral>(
+    `ambulance/referrals/${referralId}/accept/`,
+  )
+  return response.data
 }
 
 export function getAmbulanceRequests(): Promise<AmbulanceRequest[]> {
   return fetchCollection<AmbulanceRequest>('ambulance/requests/')
+}
+
+async function fetchCachedFacilityCollection<T>(
+  path: string,
+  cacheKey: string,
+  sanitize: (records: T[]) => T[] = (records) => records,
+): Promise<T[]> {
+  try {
+    const records = await fetchCollection<T>(path)
+    if (typeof window !== 'undefined') {
+      try {
+        await cacheFacilityData(cacheKey, sanitize(records))
+      } catch (error) {
+        console.error(`Could not cache facility data (${cacheKey}).`, error)
+      }
+    }
+    return records
+  } catch (error) {
+    if (!axios.isAxiosError(error) || error.response) throw error
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = await readCachedFacilityData<T[]>(cacheKey)
+        if (cached) return cached
+      } catch (cacheError) {
+        console.error(`Could not read cached facility data (${cacheKey}).`, cacheError)
+      }
+    }
+    throw error
+  }
 }
 
 function roundAmbulanceCoordinates(latitude: number, longitude: number) {
@@ -160,6 +216,32 @@ export async function createAmbulanceRequest(request: AmbulanceRequestCreate): P
     ...request,
     pickup_latitude: coordinates.latitude,
     pickup_longitude: coordinates.longitude,
+  })
+  return response.data
+}
+
+export interface DriverTelemetrySessionLink {
+  driver_url: string
+  expires_at: string
+  detail: string
+}
+
+export async function createDriverTelemetrySession(ambulanceRequestId: number): Promise<DriverTelemetrySessionLink> {
+  const response = await api.post<DriverTelemetrySessionLink>('driver-telemetry/sessions/', {
+    ambulance_request_id: ambulanceRequestId,
+  })
+  return response.data
+}
+
+export interface DriverTelemetryExchange {
+  access_token: string
+  expires_at: string
+  ambulance_request_id: number
+}
+
+export async function exchangeDriverLink(linkToken: string): Promise<DriverTelemetryExchange> {
+  const response = await api.post<DriverTelemetryExchange>('driver-telemetry/exchange/', {
+    link_token: linkToken,
   })
   return response.data
 }
@@ -206,8 +288,9 @@ export async function cancelAmbulanceRequest(requestId: number): Promise<Ambulan
   return response.data
 }
 
-export function getHealthcareProfessionals(): Promise<HealthcareProfessional[]> {
-  return fetchCollection<HealthcareProfessional>('appointments/professionals/')
+export function getHealthcareProfessionals(hospitalId?: number): Promise<HealthcareProfessional[]> {
+  const query = hospitalId ? `?hospital=${hospitalId}` : ''
+  return fetchCollection<HealthcareProfessional>(`appointments/professionals/${query}`)
 }
 
 export function getAppointments(): Promise<Appointment[]> {
@@ -235,7 +318,43 @@ export async function updateHospital(hospitalId: number, hospital: Partial<Hospi
 }
 
 export function getHospitalResources(): Promise<HospitalResource[]> {
-  return fetchCollection<HospitalResource>('resources/stocks/')
+  return fetchCachedFacilityCollection<HospitalResource>(
+    'resources/stocks/',
+    'hospital-resources',
+    (resources) => resources.map((resource) => ({ ...resource, notes: '' })),
+  )
+}
+
+export async function getResourceBurnRates(hours = 24): Promise<ResourceBurnRatesResponse> {
+  const response = await api.get<ResourceBurnRatesResponse>('resources/burn-rates/', {
+    params: { hours },
+  })
+  return response.data
+}
+
+export interface OfflineResourceUpdateRequest {
+  idempotency_key: string
+  hospital_resource: number
+  expected_last_updated: string
+  available_quantity: number
+}
+
+export interface OfflineResourceUpdateResponse extends OfflineResourceUpdateRequest {
+  status: 'PROCESSING' | 'APPLIED' | 'CONFLICT'
+  previous_available: number | null
+  detail: string
+  created_at: string
+  applied_at: string | null
+}
+
+export async function postOfflineResourceUpdate(
+  update: OfflineResourceUpdateRequest,
+): Promise<OfflineResourceUpdateResponse> {
+  const response = await api.post<OfflineResourceUpdateResponse>(
+    'integrations/resources/offline-updates/',
+    update,
+  )
+  return response.data
 }
 
 export function getResourceCategories(): Promise<ResourceCategory[]> {

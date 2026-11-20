@@ -49,10 +49,14 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'email', 'first_name', 'last_name', 'full_name',
             'role', 'phone', 'license_number', 'specialization',
             'years_of_experience', 'bio', 'profile_picture',
-            'is_verified', 'preferred_locations', 'availability_status',
+            'is_verified', 'verification_status', 'preferred_locations',
+            'availability_status',
             'created_at', 'updated_at',
         )
-        read_only_fields = ('id', 'email', 'is_verified', 'created_at', 'updated_at')
+        read_only_fields = (
+            'id', 'email', 'is_verified', 'verification_status',
+            'created_at', 'updated_at',
+        )
 
     def get_full_name(self, obj):
         return obj.get_full_name()
@@ -73,9 +77,11 @@ class ProfessionalDocumentSerializer(serializers.ModelSerializer):
         model = ProfessionalDocument
         fields = (
             'id', 'document_type', 'file', 'description',
-            'uploaded_at', 'is_verified',
+            'uploaded_at', 'is_verified', 'verification_status',
         )
-        read_only_fields = ('id', 'uploaded_at', 'is_verified')
+        read_only_fields = (
+            'id', 'uploaded_at', 'is_verified', 'verification_status',
+        )
 
 
 class ChangePasswordSerializer(serializers.Serializer):

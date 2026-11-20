@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Activity, CalendarPlus, Clock3 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   createAppointment,
   getAppointments,
+  getHospitals,
   getHealthcareProfessionals,
 } from '../lib/api'
 import { useAuthStore } from '../store/auth'
@@ -19,6 +20,11 @@ export function AppointmentDashboard() {
   const token = useAuthStore((state) => state.accessToken)
   const user = useAuthStore((state) => state.user)
   const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
+  const hospitalParam = searchParams.get('hospital')
+  const selectedHospitalId = hospitalParam && /^\d+$/.test(hospitalParam) && Number(hospitalParam) > 0
+    ? Number(hospitalParam)
+    : undefined
   const [professionalId, setProfessionalId] = useState('')
   const [patientName, setPatientName] = useState('')
   const [patientEmail, setPatientEmail] = useState('')
@@ -35,9 +41,14 @@ export function AppointmentDashboard() {
   }, [user])
 
   const professionalsQuery = useQuery({
-    queryKey: ['appointment-professionals'],
-    queryFn: getHealthcareProfessionals,
+    queryKey: ['appointment-professionals', selectedHospitalId],
+    queryFn: () => getHealthcareProfessionals(selectedHospitalId),
     enabled: Boolean(token && user?.role === 'PATIENT'),
+  })
+  const hospitalsQuery = useQuery({
+    queryKey: ['hospitals'],
+    queryFn: getHospitals,
+    enabled: Boolean(token && selectedHospitalId),
   })
   const appointmentsQuery = useQuery({
     queryKey: ['appointments'],
@@ -49,9 +60,17 @@ export function AppointmentDashboard() {
     onSuccess: async (appointment) => {
       await queryClient.invalidateQueries({ queryKey: ['appointments'] })
       setStartDateTime('')
-      setSuccessMessage(`Your request with ${appointment.professional_name} has been submitted.`)
+      setSuccessMessage(
+        `Your request with ${appointment.professional_name}${appointment.hospital_name ? ` at ${appointment.hospital_name}` : ''} has been submitted.`,
+      )
     },
   })
+  const selectedHospital = hospitalsQuery.data?.find((hospital) => hospital.id === selectedHospitalId)
+  const selectedHospitalUnavailable = Boolean(
+    selectedHospitalId
+    && !hospitalsQuery.isLoading
+    && (!selectedHospital || !selectedHospital.is_active),
+  )
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -63,6 +82,7 @@ export function AppointmentDashboard() {
       patient_phone: patientPhone.trim(),
       start_datetime: new Date(startDateTime).toISOString(),
       duration_minutes: durationMinutes,
+      ...(selectedHospitalId ? { hospital: selectedHospitalId } : {}),
     })
   }
 
@@ -97,8 +117,17 @@ export function AppointmentDashboard() {
           <header className="mb-6">
             <p className="text-xs font-bold uppercase tracking-wide text-forest">Patient care</p>
             <h1 className="mt-1 text-2xl font-semibold">Book an appointment</h1>
-            <p className="mt-1 text-sm text-muted">Choose an available professional and request a date, time, and duration.</p>
+            <p className="mt-1 text-sm text-muted">
+              Choose an available professional and request a date, time, and duration.
+              {selectedHospital ? ` Booking at ${selectedHospital.name}.` : ''}
+            </p>
           </header>
+          {selectedHospitalId && hospitalsQuery.isError && (
+            <p role="alert" className="mb-5 text-sm text-[#9d4937]">The selected hospital could not be loaded. Please return to the resource list and select it again.</p>
+          )}
+          {selectedHospitalUnavailable && (
+            <p role="alert" className="mb-5 text-sm text-[#9d4937]">The selected hospital is unavailable for appointment bookings.</p>
+          )}
 
           {user?.role !== 'PATIENT' ? (
             <Card className="max-w-2xl p-5">
@@ -110,7 +139,10 @@ export function AppointmentDashboard() {
               <Card className="p-5">
                 <CardHeader>
                   <CardTitle>Appointment details</CardTitle>
-                  <p className="mt-1 text-sm text-muted">Your name and contact details will be saved with the request.</p>
+                  <p className="mt-1 text-sm text-muted">
+                    Your name and contact details will be saved with the request.
+                    {selectedHospital ? ` Hospital: ${selectedHospital.name}.` : ''}
+                  </p>
                 </CardHeader>
                 <form className="mt-5 space-y-4" onSubmit={submit}>
                   <label className="block text-sm font-medium text-ink">
@@ -132,7 +164,11 @@ export function AppointmentDashboard() {
                   {professionalsQuery.isLoading && <p className="text-xs text-muted">Loading available professionals…</p>}
                   {professionalsQuery.isError && <p role="alert" className="text-sm text-[#9d4937]">Available professionals could not be loaded. Please try again.</p>}
                   {!professionalsQuery.isLoading && !professionalsQuery.isError && professionalsQuery.data?.length === 0 && (
-                    <p className="rounded-md bg-[#fff9ed] px-3 py-2 text-sm text-[#76551a]">No professionals are currently available for booking.</p>
+                    <p className="rounded-md bg-[#fff9ed] px-3 py-2 text-sm text-[#76551a]">
+                      {selectedHospital
+                        ? `No available professionals are currently affiliated with ${selectedHospital.name}.`
+                        : 'No professionals are currently available for booking.'}
+                    </p>
                   )}
 
                   <label className="block text-sm font-medium text-ink">
@@ -208,7 +244,7 @@ export function AppointmentDashboard() {
                   )}
                   <button
                     className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-forest px-4 text-sm font-semibold text-white transition hover:bg-[#164333] disabled:cursor-wait disabled:opacity-70"
-                    disabled={bookingMutation.isPending || !professionalsQuery.data?.length}
+                    disabled={bookingMutation.isPending || !professionalsQuery.data?.length || selectedHospitalUnavailable}
                     type="submit"
                   >
                     <CalendarPlus size={16} aria-hidden="true" />
@@ -237,6 +273,7 @@ export function AppointmentDashboard() {
                             {appointment.professional_role.replace('_', ' ')}
                             {appointment.professional_specialization ? ` · ${appointment.professional_specialization}` : ''}
                           </p>
+                          {appointment.hospital_name && <p className="mt-1 text-xs text-muted">{appointment.hospital_name}</p>}
                         </div>
                         <span className="rounded-full bg-[#eaf3ee] px-2.5 py-1 text-xs font-semibold text-[#28664e]">
                           {appointment.status.replace('_', ' ')}

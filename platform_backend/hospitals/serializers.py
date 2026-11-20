@@ -20,7 +20,9 @@ class HospitalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Hospital
         fields = (
-            'id', 'name', 'registration_number', 'address', 'city',
+            'id', 'name', 'registration_number', 'master_facility_code',
+            'facility_level', 'ownership_type', 'county', 'sub_county',
+            'county_rank', 'sub_county_rank', 'address', 'city',
             'state', 'country', 'postal_code', 'phone', 'email',
             'website', 'logo', 'description', 'is_active',
             'latitude', 'longitude', 'created_at', 'updated_at',
@@ -37,7 +39,9 @@ class HospitalListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Hospital
         fields = (
-            'id', 'name', 'city', 'country', 'phone', 'email',
+            'id', 'name', 'master_facility_code', 'facility_level',
+            'ownership_type', 'county', 'sub_county', 'county_rank',
+            'sub_county_rank', 'city', 'country', 'phone', 'email',
             'logo', 'is_active', 'latitude', 'longitude',
         )
 

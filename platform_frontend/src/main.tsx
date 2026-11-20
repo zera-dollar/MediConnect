@@ -24,3 +24,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 )
+
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch((error: unknown) => {
+    console.error('MediConnect offline shell registration failed.', error)
+  })
+}

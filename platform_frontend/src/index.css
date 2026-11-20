@@ -6,8 +6,8 @@
 
 :root {
   font-family: 'DM Sans', Aptos, sans-serif;
-  color: #183348;
-  background: #f2f7fb;
+  color: #17352f;
+  background: #f3f8f5;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -24,8 +24,8 @@ body {
   min-height: 100vh;
   margin: 0;
   background:
-    radial-gradient(ellipse at 12% -12%, rgba(20, 125, 130, 0.08), transparent 38%),
-    linear-gradient(180deg, #f8fbfd 0%, #f2f7fb 52%, #eef5f9 100%);
+    radial-gradient(ellipse at 12% -12%, rgba(22, 116, 91, 0.08), transparent 38%),
+    linear-gradient(180deg, #fbfdfb 0%, #f3f8f5 54%, #edf5f0 100%);
 }
 
 button,
@@ -40,13 +40,13 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid rgba(20, 125, 130, 0.32);
+  outline: 3px solid rgba(22, 116, 91, 0.38);
   outline-offset: 2px;
 }
 
 ::selection {
-  color: #12384d;
-  background: #c9ece7;
+  color: #123c34;
+  background: #ccebdc;
 }
 
 @layer base {
@@ -67,7 +67,7 @@ textarea:focus-visible {
 
   input[type='checkbox'],
   input[type='radio'] {
-    accent-color: #147d82;
+    accent-color: #16745b;
   }
 
   table {

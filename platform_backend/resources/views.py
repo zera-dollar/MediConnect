@@ -1,13 +1,16 @@
+from datetime import timedelta
+
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .models import (
     ResourceCategory, ResourceType, HospitalResource,
-    ResourceTransaction, BloodStock, OxygenSupply
+    HospitalResourceSnapshot, ResourceTransaction, BloodStock, OxygenSupply
 )
 from .serializers import (
     ResourceCategorySerializer, ResourceTypeSerializer,
@@ -16,6 +19,109 @@ from .serializers import (
 )
 from accounts.permissions import IsHospitalAdmin
 from notifications.models import Notification
+
+
+class ResourceBurnRateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            lookback_hours = int(request.query_params.get('hours', 24))
+        except (TypeError, ValueError):
+            return Response(
+                {'detail': 'hours must be an integer between 1 and 720.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not 1 <= lookback_hours <= 720:
+            return Response(
+                {'detail': 'hours must be an integer between 1 and 720.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        resources = HospitalResource.objects.filter(is_active=True).select_related(
+            'hospital', 'resource_type'
+        )
+        for parameter, field in (
+            ('hospital', 'hospital_id'),
+            ('resource', 'pk'),
+        ):
+            value = request.query_params.get(parameter)
+            if value is not None:
+                try:
+                    resource_id = int(value)
+                except ValueError:
+                    return Response(
+                        {'detail': f'{parameter} must be an integer.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                resources = resources.filter(**{field: resource_id})
+
+        now = timezone.now()
+        start = now - timedelta(hours=lookback_hours)
+        resource_list = list(resources.order_by('pk'))
+        snapshots_by_resource = {}
+        snapshots = HospitalResourceSnapshot.objects.filter(
+            hospital_resource_id_at_capture__in=[item.pk for item in resource_list],
+            recorded_at__gte=start,
+            recorded_at__lte=now,
+        ).order_by('hospital_resource_id_at_capture', 'recorded_at')
+        for snapshot in snapshots:
+            snapshots_by_resource.setdefault(
+                snapshot.hospital_resource_id_at_capture, []
+            ).append(snapshot)
+
+        results = []
+        for resource in resource_list:
+            history = snapshots_by_resource.get(resource.pk, [])
+            first = history[0] if history else None
+            latest = history[-1] if history else None
+            observed_hours = (
+                (latest.recorded_at - first.recorded_at).total_seconds() / 3600
+                if first and latest
+                else 0
+            )
+            enough_history = len(history) >= 2 and observed_hours >= 1
+
+            burn_rate = None
+            projected_hours_remaining = None
+            if enough_history:
+                net_depletion = (
+                    first.available_quantity - latest.available_quantity
+                ) / observed_hours
+                burn_rate = round(max(0, net_depletion), 4)
+                if burn_rate > 0:
+                    projected_hours_remaining = round(
+                        latest.available_quantity / burn_rate, 2
+                    )
+
+            results.append({
+                'resource_id': resource.pk,
+                'hospital_id': resource.hospital_id,
+                'hospital_name': resource.hospital.name,
+                'resource_type_id': resource.resource_type_id,
+                'resource_type_name': resource.resource_type.name,
+                'sufficient_history': enough_history,
+                'sample_count': len(history),
+                'observed_hours': round(observed_hours, 2),
+                'burn_rate_per_hour': burn_rate,
+                'projected_hours_remaining': projected_hours_remaining,
+                'latest_snapshot': (
+                    {
+                        'recorded_at': latest.recorded_at,
+                        'available_quantity': latest.available_quantity,
+                        'total_capacity': latest.total_capacity,
+                        'reserved_quantity': latest.reserved_quantity,
+                    }
+                    if latest
+                    else None
+                ),
+            })
+
+        return Response({
+            'lookback_hours': lookback_hours,
+            'minimum_observation_hours': 1,
+            'results': results,
+        })
 
 
 @extend_schema_view(

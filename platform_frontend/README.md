@@ -11,15 +11,23 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. The dashboard starts in **Sample data · not live** mode; these demonstration figures are not hospital data.
+Open the local URL printed by Vite to see the public MediConnect landing page. After signing in, role-specific dashboards provide access to platform features. Any sample dashboard data is labeled **Sample data · not live** and is not hospital data.
+
+## Public landing page
+
+The unauthenticated home page introduces MediConnect and links to sign-in and account creation. It describes patient features such as nearby hospital discovery, facility-reported beds, blood, oxygen and equipment availability, appointment requests, and in-app ambulance requests. It also outlines operational tools for healthcare teams, including staffing, resource updates, notifications, and activity history.
+
+The landing page's resource overview is an illustration of the platform, not live hospital data. Actual resource availability depends on facility-reported updates. Sharing device location is optional and is used to estimate distance to listed hospitals. Ambulance requests go to a hospital's in-app dispatch team; MediConnect is not connected to an external ambulance provider or emergency service. In an emergency, contact local emergency services directly.
 
 ## Connect to Django
 
-Start the backend separately, then select **Connect live data** and sign in with an existing account. Access and refresh tokens are kept in memory only and are cleared when the page is refreshed or the user signs out. Expired access tokens are refreshed through `/api/auth/token/refresh/`.
+Start the backend separately, then choose **Sign in** and use an existing account. Access and refresh tokens are kept in memory only and are cleared when the page is refreshed or the user signs out. Expired access tokens are refreshed through `/api/auth/token/refresh/`.
 
 Patients and professionals can create an account from the sign-in page. Hospital and platform administrator accounts must be created by an administrator.
 
-Patient accounts can open `/appointments` to request time with an available healthcare professional. Each request records the patient’s name, email or phone, appointment date/time, and duration; requests appear in the patient’s appointment list with their current status.
+After sign-in, each role is routed to its own dashboard. Patient navigation focuses on notifications, ambulance services, nearby hospitals, appointment booking, profile settings, and expandable hospital-resource availability for oxygen, blood, beds, and equipment. Nearby hospital distances use the patient's device location when shared; resource lists can be searched and filtered by hospital and type, and are sorted from highest to lowest availability. Administrators, hospital administrators, clinicians, nurses, and staff receive distinct operational shortcuts, live API-backed metrics, and actionable work queues; unavailable API data is identified rather than presented as zero. The shared workspace navigation groups tools by task, adapts to mobile screens, and provides account sign-out.
+
+Patient accounts can open `/appointments` to request time with an available healthcare professional. Selecting a hospital from the patient resource display offers appointment and ambulance actions; hospital-specific bookings are limited to professionals affiliated with that hospital. Each request records the patient’s name, email or phone, appointment date/time, and duration; requests appear in the patient’s appointment list with their current status.
 
 The API base URL defaults to `http://127.0.0.1:8000/api`. Copy `.env.example` to `.env.local` to configure the API URL, `VITE_GOOGLE_MAPS_API_KEY`, and optional `VITE_AMBULANCE_PHONE`, then restart Vite. Restrict the Google Maps key to the frontend origins and enable Maps JavaScript API and Directions API with billing.
 
@@ -38,14 +46,23 @@ The dashboard uses routes found in the backend source:
 - `GET/POST /api/notifications/` and notification read actions for the authenticated inbox
 - `GET/PATCH /api/preferences/` for notification delivery preferences
 - `GET/POST /api/ambulance/requests/` and request dispatch, status, location, and cancel actions for in-app ambulance workflow
-
-ICU resources are identified when their category or resource type name contains “ICU”. Capacity, available, and reserved counts come from the resource serializer; occupied beds are calculated as capacity minus available and reserved. No patient-level data is requested.
+- `GET/POST /api/ambulance/referrals/` and `POST /api/ambulance/referrals/<id>/accept/` for structured interfacility triage, resource reservation, and linked transport
+- `GET /api/hospitals/mine/` for the user's active facility memberships and facility role
+- `GET /api/resources/burn-rates/?hours=24` for snapshot-derived resource depletion estimates
+- `/api/driver-telemetry/` for one-use driver links and token exchange; the driver PWA streams GPS over WebSocket
+- `/api/integrations/sms/inbound/`, `/api/integrations/ussd/callback/`, and `/api/integrations/resources/offline-updates/` for authorized fallback updates and offline sync
 
 ## Hospital maps and ambulance requests
 
 Open `/hospitals`, allow device location, and select a hospital to view the Google Maps driving route, distance, and estimated travel time. Without a configured Maps key, the page shows direct-line distance and an external Google Maps link; driving route estimates require the key and Maps APIs listed above.
 
-Open `/ambulance` to submit a transport request and track status, vehicle coordinates, and dispatcher-provided ETA. Updates are polled every five seconds. This is an internal demonstration workflow: no ambulance provider, emergency call center, or vehicle GPS feed is integrated. Hospital dispatchers must enter vehicle location/status, and emergency users must contact their local emergency service. `VITE_AMBULANCE_PHONE` optionally enables a click-to-call link.
+Open `/ambulance` to submit a transport request and track status, vehicle coordinates, and ETA. A hospital dispatcher can create a single-use driver link after dispatch; the driver opens it in a browser and, with location permission, streams GPS over WebSocket. Live coordinates expire after five minutes without an update and are not retained as route history. This remains an in-app workflow: there is no ambulance provider or emergency call-center integration, and dispatch status/ETA are not verified by an external fleet system. Emergency users must contact their local emergency service. `VITE_AMBULANCE_PHONE` optionally enables a click-to-call link.
+
+## Interfacility referrals
+
+Nurses and authorized source-facility staff can open `/referrals` to submit a structured triage handoff, select a receiving facility and requested resource, and view the referral status. A receiving-facility admin, manager, or coordinator can accept; acceptance reserves the requested resource and creates a linked ambulance request. The transport map shows the source-to-receiving-facility route and the driver's live position when available. Clinical triage remains online-only and is not placed in the offline cache.
+
+Facility lists display master registry codes, level, ownership, county/sub-county, and available rankings when supplied. Registry records are imported by an administrator from a validated CSV; live authoritative registry synchronization is not configured.
 
 ## Organs resource category
 
@@ -65,7 +82,7 @@ Open `/audit` to inspect resource transaction history. After connecting with an 
 
 ## Analytics dashboard
 
-Open `/analytics` to view facility-filtered summaries of the current resource inventory and oxygen supply records. The dashboard computes metrics from `GET /api/resources/stocks/` and `GET /api/resources/oxygen/`; it does not use demonstration values. CSV export includes the successfully fetched records matching the selected facility, with resource quantities annotated by their unit. Resource counts are used instead of adding capacity or availability values across unlike measurement units. These endpoints expose current state rather than time-series analytics, so the dashboard does not claim historical trends; any API failure is shown explicitly, and partial data is identified as partial.
+Open `/analytics` to view facility-filtered summaries of current resource inventory and oxygen supplies plus resource burn-rate estimates. The dashboard calculates time-series estimates from hourly snapshots returned by `GET /api/resources/burn-rates/?hours=24`; projections are unavailable until two snapshots span at least an hour and should be treated as operational estimates, not predictions. CSV export includes current inventory and oxygen records, not the snapshot history. API errors are shown explicitly and partial data is identified.
 
 ## Reports
 
@@ -73,7 +90,13 @@ Open `/reports` to view current resource inventory (`GET /api/resources/stocks/`
 
 ## System settings
 
-Open `/settings` while connected to manage the authenticated account profile through `GET/PATCH /api/auth/profile/`, change the password through `POST /api/auth/change-password/`, manage notification preferences through `/api/preferences/`, and upload verification documents through `/api/auth/documents/`. Email, role, and verification status are read-only. Password policy validation is enforced by the backend. Application-wide settings are not provided by the backend.
+Open `/settings` while connected to manage the authenticated account profile through `GET/PATCH /api/auth/profile/`, change the password through `POST /api/auth/change-password/`, manage notification preferences through `/api/preferences/`, and upload verification documents through `/api/auth/documents/`. Credential states distinguish queued checks from pending authorized KMPDC/registry access; the current adapter does not mark credentials verified. Email, role, and verification status are read-only. Password policy validation is enforced by the backend.
+
+## Offline and low-bandwidth support
+
+The service worker caches the app shell and public facility/resource snapshots; it does not cache clinical triage, patient records, or authentication tokens. Authorized staff can queue non-clinical resource quantity updates in IndexedDB. Sync submits an idempotency key and the last-seen resource timestamp; a stale update is returned as a conflict for review rather than silently overwriting newer data. Offline synchronization does not imply that cached availability is current.
+
+SMS and USSD use normalized provider-neutral callbacks secured by separate webhook tokens. The structured `BED` and `O2` commands update counts only when the sender's registered phone belongs to an active facility manager/coordinator. Actual carrier/provider delivery requires an external adapter and credentials. M-Pesa configuration is present for integration planning, but payment checkout and all money movement are disabled.
 
 ## Staffing and notifications
 
@@ -85,5 +108,3 @@ Open `/staffing` to browse public contracts, submit bids, review bids (hospital 
 npm test
 npm run build
 ```
-
-The focused tests cover ICU resource filtering, bed totals, occupancy, and empty-capacity handling.

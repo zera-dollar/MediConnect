@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from hospitals.models import Hospital, HospitalStaff
 from .models import Appointment
 
 
@@ -115,3 +116,60 @@ class AppointmentApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual([professional['id'] for professional in response.data['results']], [self.professional.pk])
         self.assertNotIn(unavailable.pk, [professional['id'] for professional in response.data['results']])
+
+    def test_selected_hospital_is_saved_and_picker_only_returns_its_staff(self):
+        hospital = Hospital.objects.create(
+            name='Selected Hospital',
+            registration_number='TEST-APPT-001',
+            address='1 Test Road',
+            city='Nairobi',
+            country='Kenya',
+            phone='+254700000000',
+            email='hospital@example.test',
+        )
+        HospitalStaff.objects.create(
+            user=self.professional,
+            hospital=hospital,
+            role_at_hospital='STAFF',
+        )
+        self.payload['hospital'] = hospital.pk
+
+        response = self.client.post(
+            '/api/appointments/bookings/',
+            self.payload,
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['hospital'], hospital.pk)
+        self.assertEqual(response.data['hospital_name'], hospital.name)
+
+        picker_response = self.client.get(
+            '/api/appointments/professionals/',
+            {'hospital': hospital.pk},
+        )
+        self.assertEqual(
+            [professional['id'] for professional in picker_response.data['results']],
+            [self.professional.pk],
+        )
+
+    def test_patient_cannot_book_a_professional_at_an_unaffiliated_hospital(self):
+        hospital = Hospital.objects.create(
+            name='Other Hospital',
+            registration_number='TEST-APPT-002',
+            address='2 Test Road',
+            city='Nairobi',
+            country='Kenya',
+            phone='+254700000001',
+            email='other-hospital@example.test',
+        )
+        self.payload['hospital'] = hospital.pk
+
+        response = self.client.post(
+            '/api/appointments/bookings/',
+            self.payload,
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('professional', response.data)

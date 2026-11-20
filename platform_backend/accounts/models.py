@@ -34,6 +34,13 @@ class User(AbstractUser):
         STAFF = 'STAFF', _('Hospital Staff')
         PATIENT = 'PATIENT', _('Patient')
 
+    class VerificationStatus(models.TextChoices):
+        NOT_SUBMITTED = 'NOT_SUBMITTED', _('Not submitted')
+        PENDING = 'PENDING', _('Pending verification')
+        PENDING_EXTERNAL_ACCESS = 'PENDING_EXTERNAL_ACCESS', _('Pending external access')
+        VERIFIED = 'VERIFIED', _('Verified')
+        REJECTED = 'REJECTED', _('Rejected')
+
     username = None  # Use email as the unique identifier
     email = models.EmailField(_('email address'), unique=True)
     role = models.CharField(
@@ -54,6 +61,12 @@ class User(AbstractUser):
     is_verified = models.BooleanField(
         default=False,
         help_text=_('Whether the professional credentials have been verified')
+    )
+    verification_status = models.CharField(
+        max_length=32,
+        choices=VerificationStatus.choices,
+        default=VerificationStatus.NOT_SUBMITTED,
+        help_text=_('Current professional credential verification state')
     )
     preferred_locations = models.JSONField(
         default=list,
@@ -118,6 +131,11 @@ class ProfessionalDocument(models.Model):
     )
     file = models.FileField(upload_to='documents/')
     description = models.CharField(max_length=255, blank=True)
+    verification_status = models.CharField(
+        max_length=32,
+        choices=User.VerificationStatus.choices,
+        default=User.VerificationStatus.PENDING,
+    )
     uploaded_at = models.DateTimeField(auto_now_add=True)
     is_verified = models.BooleanField(default=False)
 

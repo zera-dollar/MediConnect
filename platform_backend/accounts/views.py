@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from drf_spectacular.utils import extend_schema, extend_schema_view
 
 from .serializers import (
@@ -15,6 +16,7 @@ from .serializers import (
     ChangePasswordSerializer,
 )
 from .models import ProfessionalDocument
+from .tasks import verify_professional_document
 from .permissions import IsOwnerOrAdmin
 
 User = get_user_model()
@@ -110,4 +112,14 @@ class ProfessionalDocumentViewSet(viewsets.ModelViewSet):
         return ProfessionalDocument.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        document = serializer.save(
+            user=self.request.user,
+            verification_status=User.VerificationStatus.PENDING,
+        )
+        user = self.request.user
+        user.is_verified = False
+        user.verification_status = User.VerificationStatus.PENDING
+        user.save(update_fields=['is_verified', 'verification_status', 'updated_at'])
+        transaction.on_commit(
+            lambda: verify_professional_document.delay(document.pk)
+        )

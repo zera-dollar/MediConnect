@@ -1,11 +1,44 @@
 from django.db import models
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.utils.translation import gettext_lazy as _
 
 
 class Hospital(models.Model):
+    class FacilityLevel(models.IntegerChoices):
+        LEVEL_1 = 1, 'Level 1'
+        LEVEL_2 = 2, 'Level 2'
+        LEVEL_3 = 3, 'Level 3'
+        LEVEL_4 = 4, 'Level 4'
+        LEVEL_5 = 5, 'Level 5'
+        LEVEL_6 = 6, 'Level 6'
+
     name = models.CharField(max_length=255)
     registration_number = models.CharField(max_length=100, unique=True)
+    master_facility_code = models.CharField(
+        max_length=100,
+        unique=True,
+        null=True,
+        help_text=_('Unique code from the authoritative facility registry')
+    )
+    facility_level = models.PositiveSmallIntegerField(
+        choices=FacilityLevel.choices,
+        null=True,
+        blank=True,
+    )
+    ownership_type = models.CharField(max_length=100, blank=True)
+    county = models.CharField(max_length=100, blank=True)
+    sub_county = models.CharField(max_length=100, blank=True)
+    county_rank = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+    )
+    sub_county_rank = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+    )
     address = models.TextField()
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100, blank=True)

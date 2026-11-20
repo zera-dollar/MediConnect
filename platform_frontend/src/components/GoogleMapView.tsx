@@ -12,6 +12,8 @@ interface GoogleMapViewProps {
   hospitals: Hospital[]
   origin: MapPoint | null
   destination: MapPoint | null
+  vehicleLocation?: MapPoint | null
+  vehicleLabel?: string
   originLabel: string
   destinationLabel: string
   selectedHospitalId?: number | null
@@ -56,6 +58,8 @@ export function GoogleMapView({
   hospitals,
   origin,
   destination,
+  vehicleLocation = null,
+  vehicleLabel = 'Ambulance location',
   originLabel,
   destinationLabel,
   selectedHospitalId = null,
@@ -159,6 +163,15 @@ export function GoogleMapView({
       hasBounds = true
     }
 
+    if (vehicleLocation) {
+      markers.current.push(new google.maps.Marker({
+        map,
+        position: vehicleLocation,
+        title: vehicleLabel,
+        label: 'A',
+      }))
+    }
+
     if (hasBounds) map.fitBounds(bounds)
   }, [
     destination,
@@ -169,6 +182,8 @@ export function GoogleMapView({
     origin,
     originLabel,
     selectedHospitalId,
+    vehicleLabel,
+    vehicleLocation,
   ])
 
   useEffect(() => {

@@ -37,6 +37,9 @@ INSTALLED_APPS = [
     'notifications',
     'ambulances',
     'appointments',
+    'activity_ledger',
+    'driver_telemetry',
+    'integrations',
 ]
 
 MIDDLEWARE = [
@@ -48,6 +51,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'activity_ledger.middleware.ActivityLedgerMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -68,6 +72,41 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+ASGI_APPLICATION = 'config.asgi.application'
+
+REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0')
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {'hosts': [REDIS_URL]},
+    },
+}
+
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', REDIS_URL)
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', REDIS_URL)
+CELERY_TIMEZONE = os.getenv('TIME_ZONE', 'UTC')
+CELERY_BEAT_SCHEDULE = {
+    'snapshot-hospital-resources-hourly': {
+        'task': 'resources.tasks.snapshot_hospital_resources',
+        'schedule': 3600.0,
+    },
+}
+
+MPESA_ENVIRONMENT = os.getenv('MPESA_ENVIRONMENT', 'sandbox')
+MPESA_CONSUMER_KEY = os.getenv('MPESA_CONSUMER_KEY', '')
+MPESA_CONSUMER_SECRET = os.getenv('MPESA_CONSUMER_SECRET', '')
+MPESA_SHORTCODE = os.getenv('MPESA_SHORTCODE', '')
+MPESA_PASSKEY = os.getenv('MPESA_PASSKEY', '')
+MPESA_PAYMENTS_ENABLED = os.getenv('MPESA_PAYMENTS_ENABLED', 'false').lower() == 'true'
+FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'http://127.0.0.1:5173')
+
+SMS_WEBHOOK_TOKEN = os.getenv('SMS_WEBHOOK_TOKEN', '')
+USSD_WEBHOOK_TOKEN = os.getenv('USSD_WEBHOOK_TOKEN', '')
+SMS_GATEWAY_URL = os.getenv('SMS_GATEWAY_URL', '')
+SMS_GATEWAY_TOKEN = os.getenv('SMS_GATEWAY_TOKEN', '')
+
+KMPDC_API_BASE_URL = os.getenv('KMPDC_API_BASE_URL', '')
+KMPDC_API_TOKEN = os.getenv('KMPDC_API_TOKEN', '')
 
 DATABASES = {
     'default': {
@@ -77,6 +116,7 @@ DATABASES = {
         'PASSWORD': os.getenv('DB_PASSWORD', ''),
         'HOST': os.getenv('DB_HOST', ''),
         'PORT': os.getenv('DB_PORT', ''),
+        'CONN_MAX_AGE': int(os.getenv('DB_CONN_MAX_AGE', '60')),
     }
 }
 

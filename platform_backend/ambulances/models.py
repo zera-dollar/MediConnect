@@ -81,3 +81,84 @@ class AmbulanceRequest(models.Model):
         return f'Ambulance request {self.pk} ({self.status})'
 
 
+class InterfacilityReferral(models.Model):
+    class Acuity(models.TextChoices):
+        CRITICAL = 'CRITICAL', _('Critical')
+        EMERGENCY = 'EMERGENCY', _('Emergency')
+        URGENT = 'URGENT', _('Urgent')
+        ROUTINE = 'ROUTINE', _('Routine')
+
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', _('Pending')
+        ACCEPTED = 'ACCEPTED', _('Accepted')
+        CANCELLED = 'CANCELLED', _('Cancelled')
+
+    source_hospital = models.ForeignKey(
+        'hospitals.Hospital',
+        on_delete=models.PROTECT,
+        related_name='outgoing_referrals',
+    )
+    receiving_hospital = models.ForeignKey(
+        'hospitals.Hospital',
+        on_delete=models.PROTECT,
+        related_name='incoming_referrals',
+    )
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='interfacility_referrals',
+    )
+    referred_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='created_interfacility_referrals',
+    )
+    presenting_concern = models.TextField(max_length=2000)
+    acuity = models.CharField(max_length=20, choices=Acuity.choices)
+    vitals = models.JSONField(default=dict, blank=True)
+    interventions = models.TextField(max_length=2000, blank=True)
+    resource_type = models.ForeignKey(
+        'resources.ResourceType',
+        on_delete=models.PROTECT,
+        related_name='interfacility_referrals',
+    )
+    resource_quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    ambulance_request = models.OneToOneField(
+        AmbulanceRequest,
+        on_delete=models.PROTECT,
+        related_name='interfacility_referral',
+        null=True,
+        blank=True,
+    )
+    reservation_transaction = models.OneToOneField(
+        'resources.ResourceTransaction',
+        on_delete=models.PROTECT,
+        related_name='interfacility_referral',
+        null=True,
+        blank=True,
+    )
+    accepted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='accepted_interfacility_referrals',
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['source_hospital', 'status']),
+            models.Index(fields=['receiving_hospital', 'status']),
+        ]
+
+    def __str__(self):
+        return f'Referral {self.pk} ({self.status})'
