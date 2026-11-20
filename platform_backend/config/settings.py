@@ -20,7 +20,7 @@ ALLOWED_HOSTS = [
     for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
     if host.strip()
 ]
-VERCEL_BACKEND_HOST = 'platformbackend-nine.vercel.app'
+VERCEL_BACKEND_HOST = 'https://platformbackend-b6shqbo8e-isaacs-projects-162172f6.vercel.app/'
 if VERCEL_BACKEND_HOST not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(VERCEL_BACKEND_HOST)
 
