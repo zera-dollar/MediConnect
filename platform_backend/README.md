@@ -456,8 +456,10 @@ version for the virtualenv and web app.
    unique, strong `SECRET_KEY`, `DEBUG=False`, and `ALLOWED_HOSTS` to your
    actual web app hostname, for example `YOURUSERNAME.pythonanywhere.com`
    (use the EU hostname or custom domain if applicable). Set
-   `FRONTEND_BASE_URL=https://platformfrontend-delta.vercel.app` for driver
-   links. The Vercel frontend is already included in the CORS allowlist.
+   `FRONTEND_BASE_URL=https://medi-connect-drab.vercel.app` for driver
+   links. This frontend and `https://platformfrontend-delta.vercel.app` are
+   included in the CORS allowlist. Add any other frontend origins to
+   `CORS_ALLOWED_ORIGINS` as a comma-separated list.
    Configure the database and other service credentials there as needed.
 
 3. In the same activated virtualenv, run:
@@ -487,7 +489,9 @@ version for the virtualenv and web app.
 5. Add a static-files mapping from `/static/` to
    `/home/YOURUSERNAME/MediConnect/platform_backend/staticfiles`, then reload
    the web app. Visit `https://YOURUSERNAME.pythonanywhere.com/` and
-   `/api/docs/` to check it. In Vercel, set `VITE_API_BASE_URL` to
+   `/api/docs/` to check it. The root response should identify `MediConnect API`;
+   if it does not, check the WSGI configuration and checkout path above.
+   In Vercel, set `VITE_API_BASE_URL` to
    `https://YOURUSERNAME.pythonanywhere.com/api` and redeploy the frontend.
 
 The WSGI setup serves HTTP only: driver telemetry WebSockets require a separate

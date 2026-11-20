@@ -207,9 +207,13 @@ CORS_ALLOWED_ORIGINS = [
     ).split(',')
     if origin.strip()
 ]
-VERCEL_FRONTEND_ORIGIN = 'https://platformfrontend-delta.vercel.app'
-if VERCEL_FRONTEND_ORIGIN not in CORS_ALLOWED_ORIGINS:
-    CORS_ALLOWED_ORIGINS.append(VERCEL_FRONTEND_ORIGIN)
+VERCEL_FRONTEND_ORIGINS = [
+    'https://platformfrontend-delta.vercel.app',
+    'https://medi-connect-drab.vercel.app',
+]
+for origin in VERCEL_FRONTEND_ORIGINS:
+    if origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(origin)
 
 # Spectacular (OpenAPI / Swagger)
 SPECTACULAR_SETTINGS = {

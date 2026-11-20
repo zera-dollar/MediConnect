@@ -37,6 +37,22 @@ class DeploymentCorsTests(SimpleTestCase):
         self.assertIn('authorization', response['access-control-allow-headers'])
         self.assertIn('content-type', response['access-control-allow-headers'])
 
+    def test_medi_connect_frontend_can_register(self):
+        response = self.client.options(
+            '/api/auth/register/',
+            HTTP_HOST='example.pythonanywhere.com',
+            HTTP_ORIGIN='https://medi-connect-drab.vercel.app',
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS='content-type',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['access-control-allow-origin'],
+            'https://medi-connect-drab.vercel.app',
+        )
+        self.assertIn('content-type', response['access-control-allow-headers'])
+
     def test_untrusted_origin_is_not_allowed(self):
         response = self.client.options(
             '/api/auth/login/',

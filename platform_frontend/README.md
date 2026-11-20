@@ -31,6 +31,8 @@ Patient accounts can open `/appointments` to request time with an available heal
 
 The API base URL defaults to `http://127.0.0.1:8000/api`. Copy `.env.example` to `.env.local` to configure the API URL, `VITE_GOOGLE_MAPS_API_KEY`, and optional `VITE_AMBULANCE_PHONE`, then restart Vite. Restrict the Google Maps key to the frontend origins and enable Maps JavaScript API and Directions API with billing.
 
+For Vercel, set the project root to `platform_frontend` and configure `VITE_API_BASE_URL` in the project environment before redeploying. The included `vercel.json` serves the React app for direct navigation to routes such as `/register`.
+
 The dashboard uses routes found in the backend source:
 
 - `POST /api/auth/login/` for JWT sign-in
