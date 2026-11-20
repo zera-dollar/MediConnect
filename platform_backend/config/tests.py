@@ -53,6 +53,21 @@ class DeploymentCorsTests(SimpleTestCase):
         )
         self.assertIn('content-type', response['access-control-allow-headers'])
 
+    def test_local_vite_frontends_can_log_in(self):
+        for origin in ('http://localhost:5173', 'http://127.0.0.1:5173'):
+            with self.subTest(origin=origin):
+                response = self.client.options(
+                    '/api/auth/login/',
+                    HTTP_HOST='example.pythonanywhere.com',
+                    HTTP_ORIGIN=origin,
+                    HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
+                    HTTP_ACCESS_CONTROL_REQUEST_HEADERS='content-type',
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response['access-control-allow-origin'], origin)
+                self.assertIn('content-type', response['access-control-allow-headers'])
+
     def test_untrusted_origin_is_not_allowed(self):
         response = self.client.options(
             '/api/auth/login/',

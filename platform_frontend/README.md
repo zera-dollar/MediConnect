@@ -29,7 +29,7 @@ After sign-in, each role is routed to its own dashboard. Patient navigation focu
 
 Patient accounts can open `/appointments` to request time with an available healthcare professional. Selecting a hospital from the patient resource display offers appointment and ambulance actions; hospital-specific bookings are limited to professionals affiliated with that hospital. Each request records the patient’s name, email or phone, appointment date/time, and duration; requests appear in the patient’s appointment list with their current status.
 
-The API base URL defaults to `http://127.0.0.1:8000/api`. Copy `.env.example` to `.env.local` to configure the API URL, `VITE_GOOGLE_MAPS_API_KEY`, and optional `VITE_AMBULANCE_PHONE`, then restart Vite. Restrict the Google Maps key to the frontend origins and enable Maps JavaScript API and Directions API with billing.
+The API base URL defaults to `http://127.0.0.1:8000/api`. Start Django on port 8000, then start Vite; the backend allows Vite's default port 5173. Configure `VITE_API_BASE_URL`, `VITE_GOOGLE_MAPS_API_KEY`, and optional `VITE_AMBULANCE_PHONE` in `.env.local` as needed, then restart Vite. If the backend has a custom `CORS_ALLOWED_ORIGINS`, include the exact frontend origin, such as `http://localhost:5173`. Restrict the Google Maps key to the frontend origins and enable Maps JavaScript API and Directions API with billing.
 
 For Vercel, set the project root to `platform_frontend` and configure `VITE_API_BASE_URL` in the project environment before redeploying. The included `vercel.json` serves the React app for direct navigation to routes such as `/register`.
 
