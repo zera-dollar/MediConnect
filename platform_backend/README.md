@@ -435,6 +435,7 @@ All endpoints are tagged and documented with request/response schemas.
 ## Production Deployment Notes
 
 1. Set `DEBUG=False`, strong `SECRET_KEY`, proper `ALLOWED_HOSTS`.
+   On Vercel, enable access to system environment variables so `VERCEL_URL` is available; the current deployment hostname is added to `ALLOWED_HOSTS` automatically.
 2. Switch to PostgreSQL (`psycopg2-binary` is already in requirements).
 3. Use WhiteNoise or a CDN for static files; store media on S3 / GCS.
 4. Run with Gunicorn + Nginx (or similar).

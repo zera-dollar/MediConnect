@@ -5,6 +5,7 @@ Django settings for Healthcare Platform (MediConnect / HealthStaff Hub).
 from pathlib import Path
 from datetime import timedelta
 import os
+from urllib.parse import urlsplit
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,9 +21,15 @@ ALLOWED_HOSTS = [
     for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
     if host.strip()
 ]
-VERCEL_BACKEND_HOST = 'https://platformbackend-b6shqbo8e-isaacs-projects-162172f6.vercel.app/'
-if VERCEL_BACKEND_HOST not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append(VERCEL_BACKEND_HOST)
+VERCEL_BACKEND_HOSTS = ['platformbackend-nine.vercel.app']
+VERCEL_URL = os.getenv('VERCEL_URL', '').strip()
+if VERCEL_URL:
+    vercel_url = urlsplit(VERCEL_URL if '://' in VERCEL_URL else f'//{VERCEL_URL}')
+    if vercel_url.hostname:
+        VERCEL_BACKEND_HOSTS.append(vercel_url.hostname)
+for host in VERCEL_BACKEND_HOSTS:
+    if host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(host)
 
 INSTALLED_APPS = [
     'django.contrib.admin',
