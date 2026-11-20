@@ -434,6 +434,77 @@ All endpoints are tagged and documented with request/response schemas.
 
 ## Production Deployment Notes
 
+### PythonAnywhere (HTTP API)
+
+The existing WSGI application can run on PythonAnywhere. Replace `YOURUSERNAME`
+and the paths below with your actual account and checkout paths. Choose a
+Python version supported by the installed Django version, and use that same
+version for the virtualenv and web app.
+
+1. In a PythonAnywhere Bash console, clone or upload the repository and create
+   a virtualenv. For example, with a checkout at `~/MediConnect`:
+
+   ```bash
+   cd ~/MediConnect/platform_backend
+   python3 -m venv ~/.virtualenvs/mediconnect
+   source ~/.virtualenvs/mediconnect/bin/activate
+   pip install -r requirements.txt
+   cp .env.example .env
+   ```
+
+2. Edit `platform_backend/.env` on PythonAnywhere (do not commit it). Set a
+   unique, strong `SECRET_KEY`, `DEBUG=False`, and `ALLOWED_HOSTS` to your
+   actual web app hostname, for example `YOURUSERNAME.pythonanywhere.com`
+   (use the EU hostname or custom domain if applicable). Set
+   `FRONTEND_BASE_URL=https://platformfrontend-delta.vercel.app` for driver
+   links. The Vercel frontend is already included in the CORS allowlist.
+   Configure the database and other service credentials there as needed.
+
+3. In the same activated virtualenv, run:
+
+   ```bash
+   python manage.py migrate
+   python manage.py collectstatic --noinput
+   python manage.py createsuperuser
+   ```
+
+4. On the PythonAnywhere **Web** tab, add a web app using **Manual
+   configuration**, select the matching Python version and set its virtualenv
+   to `/home/YOURUSERNAME/.virtualenvs/mediconnect`. Set the source code and
+   working directory to `/home/YOURUSERNAME/MediConnect/platform_backend`.
+   Edit the WSGI configuration linked from the Web tab to contain:
+
+   ```python
+   import sys
+
+   path = '/home/YOURUSERNAME/MediConnect/platform_backend'
+   if path not in sys.path:
+       sys.path.insert(0, path)
+
+   from config.wsgi import application
+   ```
+
+5. Add a static-files mapping from `/static/` to
+   `/home/YOURUSERNAME/MediConnect/platform_backend/staticfiles`, then reload
+   the web app. Visit `https://YOURUSERNAME.pythonanywhere.com/` and
+   `/api/docs/` to check it. In Vercel, set `VITE_API_BASE_URL` to
+   `https://YOURUSERNAME.pythonanywhere.com/api` and redeploy the frontend.
+
+The WSGI setup serves HTTP only: driver telemetry WebSockets require a separate
+ASGI deployment. PythonAnywhere's [ASGI support](https://help.pythonanywhere.com/pages/ASGICommandLine/)
+is experimental; the current WebSocket origin validator and Redis setup also
+need configuring for the frontend before that feature will work. Credential
+verification, urgent-bid SMS, and resource snapshots need a reachable Redis
+broker plus running Celery worker and beat; PythonAnywhere always-on tasks
+require a paid account. External network restrictions may also apply.
+
+Uploaded professional documents can contain sensitive information. Do not map
+`/media/` as public static files: the default file storage does not enforce
+the API's document permissions. Configure access-controlled storage and
+delivery before using uploads with real data.
+
+### General production guidance
+
 1. Set `DEBUG=False`, strong `SECRET_KEY`, proper `ALLOWED_HOSTS`.
    On Vercel, enable access to system environment variables so `VERCEL_URL` is available; the current deployment hostname is added to `ALLOWED_HOSTS` automatically.
 2. Switch to PostgreSQL (`psycopg2-binary` is already in requirements).

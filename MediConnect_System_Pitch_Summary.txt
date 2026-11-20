@@ -410,4 +410,4 @@ Background jobs: Celery.
 External map features: optional Google Maps configuration.
 Development demo data: synthetic records; `manage.py seed_mvp_demo_data`
 requires the core sample facilities and refuses to run when `DEBUG` is off.
-
+ 

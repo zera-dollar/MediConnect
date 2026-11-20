@@ -8,13 +8,17 @@ import os
 from urllib.parse import urlsplit
 from dotenv import load_dotenv
 
-load_dotenv()
-
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Prefer the backend's environment file regardless of the WSGI working directory.
+if (BASE_DIR / '.env').exists():
+    load_dotenv(BASE_DIR / '.env')
+else:
+    load_dotenv()
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-me-in-production-4sro$tc2yr6h&v2r#x%tqkqerfc6meu8e=e6+q)$rlf)xitxv5')
 
-DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
 ALLOWED_HOSTS = [
     host.strip()
